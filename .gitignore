@@ -1,0 +1,16 @@
+# Build artifacts
+*.exe
+*.dll
+*.pdb
+*.o
+*.a
+/tools/lan_bridge/lan_bridge
+/tools/lan_bridge/lan_bridge.exe
+/tmp/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
