@@ -31,11 +31,31 @@ Only after that is a **GO** do we turn on LAN Host→Client sync.
 
 ## Install (your PC)
 
-1. Install UE4SS into `Remnant2\Binaries\Win64\` (experimental build recommended).
+1. Install UE4SS into `Remnant2\Remnant2\Binaries\Win64\` (experimental build recommended).
 2. Copy the `Mods/MapSync` folder from this repo into `ue4ss\Mods\`.
 3. Confirm `Mods/MapSync/enabled.txt` exists (empty file is fine).
-4. If your UE4SS build uses `mods.txt`, add a line: `MapSync : 1`
-5. Start the game. You should see UE4SS console output like `[MapSync] Ready...`.
+4. In `ue4ss\Mods\mods.txt`, add: `MapSync : 1`
+5. Start the game. Check `ue4ss\UE4SS.log` for `[MapSync] Ready`.
+
+## Update MapSync (after a fix) — do this now for 0.1.1
+
+The previous build bound a `Function` UObject and crashed with `TrivialObject`.
+**0.1.1** targets live `ExplorableMinimapManager` / model instances instead.
+
+1. Download the branch ZIP:
+   https://github.com/devmarcos-dad/Remnant2-shared-map/archive/refs/heads/cursor/mapsync-fow-validation-76fb.zip
+2. Extract it. Inside you will see `Mods\MapSync\`.
+3. Delete the old folder completely:
+   `D:\SteamLibrary\steamapps\common\Remnant2\Remnant2\Binaries\Win64\ue4ss\Mods\MapSync`
+4. Copy the new `Mods\MapSync` into `ue4ss\Mods\` (same place).
+5. Keep `MapSync : 1` in `ue4ss\Mods\mods.txt` (do not remove it).
+6. Fully close Remnant 2 → open again → enter a world (solo is fine) → press **F7**.
+7. Open `ue4ss\UE4SS.log` and look for:
+   - `MapSync 0.1.1-poc` (confirms new build)
+   - `VIABILITY=GO` **or** `VIABILITY=NO-GO`
+8. Also look at the minimap — fog must visibly change for a real GO.
+
+PR: https://github.com/devmarcos-dad/Remnant2-shared-map/pull/1
 
 ## Phase 1 — validate FoW (do this first)
 

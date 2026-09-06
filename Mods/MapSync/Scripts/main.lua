@@ -6,9 +6,9 @@ local FoW = require("fow")
 local Lan = require("net.lan")
 local Probe = require("probe")
 
-Util.log("%s %s loading", Config.ModName, Config.Version)
-Status.set("Boot", Config.Version)
-Status.start_refresh_loop(Config.StatusRefreshMs)
+Util.log("%s %s loading", Config.ModName or "MapSync", Config.Version or "?")
+Status.set("Boot", Config.Version or "?")
+Status.start_refresh_loop(Config.StatusRefreshMs or 2500)
 
 local function refresh_net_status()
     local mode = NetMode.detect()
@@ -67,27 +67,45 @@ bind_key(Config.Keys.DumpNet, function()
     Status.print_screen(3.0)
 end)
 
-if Config.AutoProbeOnWorld then
-    local delay = Config.AutoProbeDelayMs or 4000
+local auto_probe_scheduled = false
+
+local function schedule_auto_probe(reason)
+    if not Config.AutoProbeOnWorld or auto_probe_scheduled then
+        return
+    end
+    auto_probe_scheduled = true
+    local delay = Config.AutoProbeDelayMs or 5000
+    Util.log("auto-probe scheduled (%s) in %dms", tostring(reason), delay)
+
+    local function fire()
+        refresh_net_status()
+        Status.set("Probing", "auto:" .. tostring(reason))
+        run_probe()
+    end
+
     if ExecuteWithDelay ~= nil then
-        ExecuteWithDelay(delay, function()
-            refresh_net_status()
-            Status.set("Probing", "auto")
-            run_probe()
-        end)
+        ExecuteWithDelay(delay, fire)
     elseif LoopAsync ~= nil then
         local fired = false
         LoopAsync(delay, function()
             if fired then return true end
             fired = true
-            refresh_net_status()
-            Status.set("Probing", "auto")
-            run_probe()
+            fire()
             return true
         end)
     else
         Util.log("%s", "No delay API; press F7 in-world to probe")
+        auto_probe_scheduled = false
     end
 end
+
+-- Prefer world-ready hook so we do not probe while still in the main menu.
+pcall(function()
+    RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
+        Util.log("%s", "ClientRestart — world available")
+        Status.set("World", "ready — auto-probe soon / press F7")
+        schedule_auto_probe("ClientRestart")
+    end)
+end)
 
 Util.log("%s", "Ready. F6=dump F7=probe F8=status F9=net")

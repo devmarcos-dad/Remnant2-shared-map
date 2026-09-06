@@ -17,14 +17,23 @@ Prove we can **read** and **reveal** Remnant 2 minimap FoW tiles via UE4SS refle
 
 - Log line: `VIABILITY=GO`
 - Status: `FoW OK`
-- Minimap visibly changes after the probe
+- Strategy mentions `ExplorableMinimapManager` / `RevealHiddenArea` / `ToggleFogOfWar` / `RevealRange`
+- **Minimap visibly changes** after the probe (fog toggles or tiles reveal)
 
 Then set `EnableLanSync = true` and run `tools/lan_bridge` on both PCs.
 
 ### NO-GO
 
 - `VIABILITY=NO-GO`
-- No useful candidates in the dump
-- Reveal calls error / no visual change
+- No live `ExplorableMinimapManager` instance found
+- All strategies fail / no visual change
 
-Stop. Attach the dump file and UE4SS log before trying deeper RE or alternate approaches. Do not enable LAN sync.
+Send the new `UE4SS.log` + `%TEMP%\MapSyncLogs\fow_dump_*.txt`. Do not enable LAN sync yet.
+
+## Remnant-specific targets (from live dump)
+
+- `GunfireRuntime.ExplorableMinimapManager` (`EnableFogOfWar`, `GetExplorableMinimapModel`)
+- `GunfireRuntime.ExplorableMinimapModel` / `Remnant.ExplorableMinimapModelRemnant` (`RevealHiddenArea`)
+- `GunfireRuntime.ExplorableMinimapComponent` (`RevealRange`)
+- `Remnant.RemnantCheatManager:ToggleFogOfWar`
+- `Remnant.RemnantPlayerController:ClientUpdateFogOfWar`

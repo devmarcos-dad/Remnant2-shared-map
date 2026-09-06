@@ -17,6 +17,42 @@ local function score_text(text, keywords)
     return score
 end
 
+local function is_rejected_class(class_name)
+    local lower = Util.lower(class_name)
+    for _, bad in ipairs(Config.RejectClassNames or {}) do
+        if lower == Util.lower(bad) then
+            return true
+        end
+    end
+    -- Also reject default objects / CDO noise when possible.
+    return false
+end
+
+local function is_live_instance(obj, full_name, class_name)
+    if not Util.is_valid(obj) then
+        return false
+    end
+    if is_rejected_class(class_name) then
+        return false
+    end
+    local full = Util.lower(full_name or "")
+    if string.find(full, "default__", 1, true) then
+        return false
+    end
+    -- UE4SS often surfaces Function/Class meta objects with FogOfWar-ish names.
+    if string.find(full, "function ", 1, true) or string.find(full, " class ", 1, true) then
+        return false
+    end
+    if string.find(full, "/script/", 1, true) and not string.find(full, "persistentlevel", 1, true)
+        and not string.find(full, "transient", 1, true) then
+        -- Class/Function path style, not a world instance.
+        if class_name == "Class" or class_name == "Function" then
+            return false
+        end
+    end
+    return true
+end
+
 local function collect_reflection(obj)
     local props = {}
     local funcs = {}
@@ -43,28 +79,29 @@ local function collect_reflection(obj)
         end)
     end)
 
+    -- Only probe known Remnant/Gunfire fields if iterators found nothing.
     if #props == 0 then
         for _, pname in ipairs({
-            "RevealedTiles", "ExploredTiles", "FogMask", "ExplorationMask",
-            "VisitedTiles", "MapFog", "bFogOfWar", "RevealedRegions",
-            "DiscoveredAreas", "MiniMapRevealMask", "FogOfWarTexture",
+            "ExplorableMinimapModel", "VisitedCoordinatesOwner", "VisitedCoordinatesMap",
+            "RevealRange", "RevealRangeZ", "TileBounds", "TileBoundsOrigin",
+            "RevealedHiddenAreasIDs", "MinimapStaticMeshList",
         }) do
             local ok, value = pcall(function() return obj[pname] end)
             if ok and value ~= nil then
-                table.insert(props, { name = pname, score = 2, preview = Util.ue_type(value) })
+                table.insert(props, { name = pname, score = 3, preview = Util.ue_type(value) })
             end
         end
     end
 
     if #funcs == 0 then
         for _, fname in ipairs({
-            "RevealTile", "RevealTiles", "RevealArea", "ExploreTile",
-            "SetTileExplored", "ClearFog", "Unfog", "RevealMap",
-            "UpdateMiniMap", "DiscoverTile", "PaintTile",
+            "EnableFogOfWar", "IsFogOfWarEnabled", "GetExplorableMinimapModel",
+            "GetExplorableMinimapManager", "RevealHiddenArea", "GetVisibilityAtLocation",
+            "ToggleFogOfWar", "ClientUpdateFogOfWar", "OnTileVisibilityUpdate",
         }) do
             local ok, fn = pcall(function() return obj[fname] end)
             if ok and fn ~= nil then
-                table.insert(funcs, { name = fname, score = 2 })
+                table.insert(funcs, { name = fname, score = 3 })
             end
         end
     end
@@ -74,17 +111,39 @@ local function collect_reflection(obj)
     return props, funcs
 end
 
+local function priority_bonus(class_name, full_name)
+    local blob = Util.lower(class_name .. " " .. full_name)
+    local bonus = 0
+    for _, name in ipairs(Config.PriorityClassNames or {}) do
+        if string.find(blob, Util.lower(name), 1, true) then
+            bonus = bonus + 20
+            break
+        end
+    end
+    if string.find(blob, "explorableminimapmanager", 1, true) then
+        bonus = bonus + 15
+    end
+    if string.find(blob, "explorableminimapmodel", 1, true) then
+        bonus = bonus + 12
+    end
+    return bonus
+end
+
 local function add_candidate(bucket, obj, source, bonus)
     if not Util.is_valid(obj) then return end
     local full = Util.safe_name(obj)
+    local class_name = Util.safe_class_name(obj)
+    if not is_live_instance(obj, full, class_name) then
+        return
+    end
     if bucket._seen[full] then return end
     bucket._seen[full] = true
 
-    local class_name = Util.safe_class_name(obj)
     local cscore = score_text(class_name .. " " .. full, Config.ClassKeywords)
     local props, funcs = collect_reflection(obj)
-    local total = (bonus or 0) + cscore + math.min(3, #props) + math.min(3, #funcs)
-    if total <= 0 and source ~= "seed" then return end
+    local total = (bonus or 0) + cscore + priority_bonus(class_name, full)
+        + math.min(4, #props) + math.min(4, #funcs)
+    if total <= 0 and source ~= "priority" then return end
 
     table.insert(bucket, {
         source = source,
@@ -97,15 +156,25 @@ local function add_candidate(bucket, obj, source, bonus)
     })
 end
 
-local function dump_seed_classes(bucket)
-    for _, class_name in ipairs(Config.SeedClassNames) do
+local function dump_priority_classes(bucket)
+    for _, class_name in ipairs(Config.PriorityClassNames or {}) do
         local ok, instances = pcall(function() return FindAllOf(class_name) end)
         if ok and instances then
+            local count = 0
             for _, obj in pairs(instances) do
-                add_candidate(bucket, obj, "seed", 3)
+                add_candidate(bucket, obj, "priority", 25)
+                count = count + 1
             end
+            Util.log("priority FindAllOf(%s) => %d", class_name, count)
         else
-            add_candidate(bucket, FindFirstOf(class_name), "seed", 3)
+            local one = nil
+            pcall(function() one = FindFirstOf(class_name) end)
+            if Util.is_valid(one) then
+                add_candidate(bucket, one, "priority", 25)
+                Util.log("priority FindFirstOf(%s) => 1", class_name)
+            else
+                Util.log("priority miss %s", class_name)
+            end
         end
     end
 end
@@ -124,8 +193,9 @@ local function dump_uobject_scan(bucket)
             if not Util.is_valid(obj) then return end
             local class_name = Util.safe_class_name(obj)
             local full = Util.safe_name(obj)
+            if not is_live_instance(obj, full, class_name) then return end
             local cscore = score_text(class_name .. " " .. full, Config.ClassKeywords)
-            if cscore > 0 then
+            if cscore > 0 or priority_bonus(class_name, full) > 0 then
                 add_candidate(bucket, obj, "scan", cscore)
             end
         end)
@@ -153,7 +223,7 @@ end
 function Probe.run_dump()
     Util.log("%s", "=== FoW reflection dump start ===")
     local bucket = { _seen = {} }
-    dump_seed_classes(bucket)
+    dump_priority_classes(bucket)
     dump_uobject_scan(bucket)
     bucket._seen = nil
 
@@ -162,7 +232,7 @@ function Probe.run_dump()
         return a.score > b.score
     end)
 
-    local max_log = Config.MaxCandidatesLogged or 200
+    local max_log = Config.MaxCandidatesLogged or 120
     local lines = {
         string.format("# MapSync FoW dump %s\n", os.date("!%Y-%m-%dT%H:%M:%SZ")),
         string.format("# candidates=%d\n\n", #bucket),

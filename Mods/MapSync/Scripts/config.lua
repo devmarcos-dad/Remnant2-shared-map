@@ -1,36 +1,45 @@
 -- MapSync personal validation config
 local Config = {
     ModName = "MapSync",
-    Version = "0.1.0-poc",
+    Version = "0.1.1-poc",
 
     StatusRefreshMs = 2500,
 
     AutoProbeOnWorld = true,
-    AutoProbeDelayMs = 4000,
+    AutoProbeDelayMs = 5000,
 
     MaxUObjectScan = 25000,
-    MaxCandidatesLogged = 200,
+    MaxCandidatesLogged = 120,
+
+    -- Prefer live Remnant / Gunfire minimap instances first.
+    PriorityClassNames = {
+        "ExplorableMinimapManager",
+        "ExplorableMinimapModelRemnant",
+        "ExplorableMinimapModel",
+        "ExplorableMinimapComponent",
+        "MinimapTileSupport",
+        "RemnantPlayerController",
+        "Remnant_PlayerController_C",
+        "RemnantCheatManager",
+    },
 
     ClassKeywords = {
-        "minimap", "mini_map", "fogofwar", "fog_of_war", "mapreveal",
-        "exploration", "explored", "zonemap", "worldmap", "cartograph",
-        "mapmanager", "mapcomponent", "mapwidget", "mapfog", "revealed",
+        "explorableminimap", "minimap", "mini_map", "fogofwar", "fog_of_war",
+        "mapreveal", "visitedcoordinates", "exploration", "explored",
     },
     PropertyKeywords = {
         "reveal", "explored", "fog", "tile", "mask", "visited", "discover",
-        "uncover", "visible", "exploration", "minimap",
+        "coordinates", "visibility", "minimap",
     },
     FunctionKeywords = {
-        "reveal", "explore", "unfog", "clearfog", "discover", "uncover",
-        "setexplored", "addtile", "updatemap", "showtile", "paint",
+        "reveal", "explore", "unfog", "clearfog", "discover",
+        "enablefog", "togglefog", "updatefog", "visib",
     },
 
-    SeedClassNames = {
-        "MiniMapComponent", "MiniMapWidget", "MapComponent",
-        "FogOfWar", "FogOfWarComponent", "ZoneMap", "ZoneMapManager",
-        "WorldMap", "RemnantMap", "GunfireMap", "MapManager", "MapReveal",
-        "ExplorationComponent", "TPSGameState",
-        "Remnant_PlayerController_C", "Character_Master_Player_C",
+    -- Meta UObject kinds we must never bind/call as gameplay instances.
+    RejectClassNames = {
+        "Function", "DelegateFunction", "Class", "Package", "Enum",
+        "ScriptStruct", "MetaData", "PackageMap",
     },
 
     Keys = {

@@ -3,141 +3,215 @@ local Status = require("lib.status")
 local Probe = require("probe")
 local Config = require("config")
 
+--- Remnant 2 FoW viability layer.
+--- Targets live Gunfire/Remnant minimap objects discovered in-game:
+---   ExplorableMinimapManager / ExplorableMinimapModel(Remnant)
+---   RemnantPlayerController:ClientUpdateFogOfWar
+---   RemnantCheatManager:ToggleFogOfWar
 local FoW = {
     Viable = false,
     LastError = nil,
     BoundObject = nil,
     BoundRevealFn = nil,
     BoundReadProp = nil,
+    BoundModel = nil,
+    BoundManager = nil,
     AppliedTiles = {},
+    LastStrategy = nil,
 }
 
-local REVEAL_NAMES = {
-    "RevealTile", "RevealTiles", "RevealArea", "ExploreTile",
-    "SetTileExplored", "ClearFog", "Unfog", "RevealMap",
-    "DiscoverTile", "PaintTile", "RevealFogOfWar", "SetFogRevealed",
-}
+local function is_usable_instance(obj)
+    if not Util.is_valid(obj) then
+        return false
+    end
+    local class_name = Util.safe_class_name(obj)
+    local lower_class = Util.lower(class_name)
+    for _, bad in ipairs(Config.RejectClassNames or {}) do
+        if lower_class == Util.lower(bad) then
+            return false
+        end
+    end
+    local full = Util.lower(Util.safe_name(obj))
+    if string.find(full, "default__", 1, true) then
+        return false
+    end
+    -- Never treat a Function meta-object as a live gameplay instance.
+    if string.find(full, "function ", 1, true) or lower_class == "function" then
+        return false
+    end
+    return true
+end
 
-local READ_PROP_NAMES = {
-    "RevealedTiles", "ExploredTiles", "FogMask", "ExplorationMask",
-    "VisitedTiles", "DiscoveredAreas", "RevealedRegions", "MiniMapRevealMask",
-}
+local function find_first(class_name)
+    local ok, all = pcall(function() return FindAllOf(class_name) end)
+    if ok and all then
+        for _, candidate in pairs(all) do
+            if is_usable_instance(candidate) then
+                return candidate
+            end
+        end
+    end
+    local obj = nil
+    pcall(function()
+        obj = FindFirstOf(class_name)
+    end)
+    if is_usable_instance(obj) then
+        return obj
+    end
+    return nil
+end
 
-local function snapshot_prop(obj, prop_name)
+local function call_method(obj, method_name, ...)
+    if not Util.is_valid(obj) then
+        return false, "invalid-object"
+    end
+    local args = { ... }
+    local n = select("#", ...)
+    local ok, err = pcall(function()
+        local fn = obj[method_name]
+        if fn == nil then
+            error("missing-method:" .. tostring(method_name))
+        end
+        -- UE4SS: colon-call equivalent. Avoid calling meta Function UObjects.
+        if n == 0 then
+            return obj[method_name](obj)
+        elseif n == 1 then
+            return obj[method_name](obj, args[1])
+        elseif n == 2 then
+            return obj[method_name](obj, args[1], args[2])
+        elseif n == 3 then
+            return obj[method_name](obj, args[1], args[2], args[3])
+        end
+        return obj[method_name](obj, args[1], args[2], args[3], args[4])
+    end)
+    if ok then
+        return true, nil
+    end
+    return false, tostring(err)
+end
+
+local function snapshot(obj, prop_name)
+    if not prop_name or not Util.is_valid(obj) then
+        return nil
+    end
     local ok, value = pcall(function() return obj[prop_name] end)
-    if not ok or value == nil then return nil end
+    if not ok or value == nil then
+        return nil
+    end
     local t = Util.ue_type(value)
     if t == "number" or t == "boolean" or t == "string" then
         return tostring(value)
     end
     local ok_len, len = pcall(function() return #value end)
     if ok_len and type(len) == "number" then
-        return string.format("%s#=%s", t, tostring(len))
+        return string.format("%s#=%d", t, len)
+    end
+    local ok_name, name = pcall(function() return value:GetFullName() end)
+    if ok_name and name then
+        return name
     end
     return tostring(t)
 end
 
-local function try_call_reveal(obj, fn_name)
-    local ok_get, got = pcall(function() return obj[fn_name] end)
-    if not ok_get or got == nil then
-        return false, "missing"
+local function resolve_manager_and_model()
+    local manager = find_first("ExplorableMinimapManager")
+    local model = find_first("ExplorableMinimapModelRemnant")
+        or find_first("ExplorableMinimapModel")
+
+    if Util.is_valid(manager) then
+        local ok, maybe_model = pcall(function()
+            if manager.GetExplorableMinimapModel ~= nil then
+                return manager:GetExplorableMinimapModel()
+            end
+            return manager.ExplorableMinimapModel
+        end)
+        if ok and Util.is_valid(maybe_model) then
+            model = maybe_model
+        end
     end
-    local attempts = {
-        function() return obj[fn_name](obj) end,
-        function() return obj[fn_name](obj, 0, 0) end,
-        function() return obj[fn_name](obj, 0, 0, 0) end,
-        function() return obj[fn_name](obj, 1, 1) end,
-        function() return obj[fn_name](obj, 0) end,
-        function() return obj[fn_name](obj, true) end,
-    }
-    for _, call in ipairs(attempts) do
-        local ok, err = pcall(call)
-        if ok then return true, fn_name end
-        FoW.LastError = tostring(err)
-    end
-    return false, FoW.LastError or "call-failed"
+
+    return manager, model
 end
 
-local function pick_binding(candidates)
-    for _, c in ipairs(candidates) do
-        local obj = c.object
-        if not Util.is_valid(obj) then goto continue end
-
-        local reveal_fn = nil
-        for _, f in ipairs(c.functions or {}) do
-            local lower = Util.lower(f.name)
-            for _, wanted in ipairs(REVEAL_NAMES) do
-                if lower == Util.lower(wanted) then
-                    reveal_fn = f.name
-                    break
-                end
-            end
-            if reveal_fn then break end
-            if string.find(lower, "reveal", 1, true)
-                or string.find(lower, "explore", 1, true)
-                or string.find(lower, "unfog", 1, true) then
-                reveal_fn = f.name
-                break
-            end
+local function try_toggle_fog_cheat()
+    local cheat = find_first("RemnantCheatManager")
+    if not Util.is_valid(cheat) then
+        -- Sometimes nested under player controller.
+        local pc = find_first("RemnantPlayerController") or find_first("Remnant_PlayerController_C")
+        if Util.is_valid(pc) then
+            pcall(function()
+                cheat = pc.CheatManager
+            end)
         end
-
-        local read_prop = nil
-        for _, p in ipairs(c.properties or {}) do
-            local lower = Util.lower(p.name)
-            for _, wanted in ipairs(READ_PROP_NAMES) do
-                if lower == Util.lower(wanted) then
-                    read_prop = p.name
-                    break
-                end
-            end
-            if read_prop then break end
-            if string.find(lower, "reveal", 1, true)
-                or string.find(lower, "explor", 1, true)
-                or string.find(lower, "fog", 1, true) then
-                read_prop = p.name
-            end
-        end
-
-        if reveal_fn or read_prop or (c.score or 0) >= 3 then
-            return obj, reveal_fn, read_prop, c
-        end
-        ::continue::
     end
-    return nil, nil, nil, nil
+    if not Util.is_valid(cheat) then
+        return false, "no-cheat-manager"
+    end
+    local ok, err = call_method(cheat, "ToggleFogOfWar")
+    if ok then
+        FoW.BoundObject = cheat
+        FoW.BoundRevealFn = "ToggleFogOfWar"
+        FoW.LastStrategy = "RemnantCheatManager:ToggleFogOfWar"
+        return true, "cheat-toggle"
+    end
+    return false, err
 end
 
-function FoW.read_revealed_tiles()
-    if not Util.is_valid(FoW.BoundObject) or not FoW.BoundReadProp then
-        return nil, "no-bound-read-prop"
+local function try_enable_fog_manager(manager)
+    if not Util.is_valid(manager) then
+        return false, "no-manager"
     end
-    local ok, value = pcall(function()
-        return FoW.BoundObject[FoW.BoundReadProp]
+
+    -- Read current state when possible.
+    local before = nil
+    pcall(function()
+        if manager.IsFogOfWarEnabled ~= nil then
+            before = tostring(manager:IsFogOfWarEnabled())
+        end
     end)
-    if not ok then return nil, tostring(value) end
-    return value, nil
+
+    -- Force FoW on, then off, then on — visual flicker proves control.
+    local ok1 = select(1, call_method(manager, "EnableFogOfWar", true))
+    local ok2 = select(1, call_method(manager, "EnableFogOfWar", false))
+    local ok3 = select(1, call_method(manager, "EnableFogOfWar", true))
+
+    local after = nil
+    pcall(function()
+        if manager.IsFogOfWarEnabled ~= nil then
+            after = tostring(manager:IsFogOfWarEnabled())
+        end
+    end)
+
+    if ok1 or ok2 or ok3 then
+        FoW.BoundObject = manager
+        FoW.BoundRevealFn = "EnableFogOfWar"
+        FoW.BoundManager = manager
+        FoW.LastStrategy = string.format("manager EnableFogOfWar before=%s after=%s", tostring(before), tostring(after))
+        return true, FoW.LastStrategy
+    end
+    return false, "EnableFogOfWar-failed"
 end
 
-function FoW.reveal_tile(zone_id, x, y)
-    Status.RevealAttempts = Status.RevealAttempts + 1
-    if not Util.is_valid(FoW.BoundObject) then
-        return false, "no-bound-object"
-    end
-    if not FoW.BoundRevealFn then
-        return false, "no-bound-reveal-fn"
+local function try_reveal_hidden_area(model)
+    if not Util.is_valid(model) then
+        return false, "no-model"
     end
 
-    local fn_name = FoW.BoundRevealFn
-    local before = FoW.BoundReadProp and snapshot_prop(FoW.BoundObject, FoW.BoundReadProp) or nil
-    local calls = {
-        function() return FoW.BoundObject[fn_name](FoW.BoundObject, zone_id or 0, x or 0, y or 0) end,
-        function() return FoW.BoundObject[fn_name](FoW.BoundObject, x or 0, y or 0) end,
-        function() return FoW.BoundObject[fn_name](FoW.BoundObject, x or 0, y or 0, zone_id or 0) end,
-        function() return FoW.BoundObject[fn_name](FoW.BoundObject) end,
+    local before = snapshot(model, "VisitedCoordinatesOwner")
+        or snapshot(model, "TileBounds")
+        or snapshot(model, "TileBoundsOrigin")
+
+    -- Signature unknown; try common patterns.
+    local attempts = {
+        function() return model:RevealHiddenArea(0) end,
+        function() return model:RevealHiddenArea(1) end,
+        function() return model:RevealHiddenArea(0, true) end,
+        function() return model:RevealHiddenArea(true) end,
+        function() return model:RevealHiddenArea() end,
     }
-
     local succeeded = false
     local last_err = nil
-    for _, call in ipairs(calls) do
+    for _, call in ipairs(attempts) do
         local ok, err = pcall(call)
         if ok then
             succeeded = true
@@ -146,88 +220,176 @@ function FoW.reveal_tile(zone_id, x, y)
         last_err = tostring(err)
     end
     if not succeeded then
-        FoW.LastError = last_err
-        return false, last_err
+        return false, last_err or "RevealHiddenArea-failed"
     end
 
-    local after = FoW.BoundReadProp and snapshot_prop(FoW.BoundObject, FoW.BoundReadProp) or nil
-    Status.RevealSuccesses = Status.RevealSuccesses + 1
-    FoW.AppliedTiles[string.format("%s:%s:%s", tostring(zone_id), tostring(x), tostring(y))] = true
+    local after = snapshot(model, "VisitedCoordinatesOwner")
+        or snapshot(model, "TileBounds")
+        or snapshot(model, "TileBoundsOrigin")
 
+    FoW.BoundObject = model
+    FoW.BoundModel = model
+    FoW.BoundRevealFn = "RevealHiddenArea"
+    FoW.LastStrategy = "model RevealHiddenArea"
     if before ~= nil and after ~= nil and before ~= after then
-        Util.log("reveal_tile property changed %s -> %s", before, after)
         return true, "property-changed"
     end
     return true, "call-ok"
 end
 
+local function try_bump_reveal_range()
+    local comp = find_first("ExplorableMinimapComponent")
+    if not Util.is_valid(comp) then
+        return false, "no-component"
+    end
+    local before = snapshot(comp, "RevealRange")
+    local ok, err = pcall(function()
+        local current = comp.RevealRange or 0
+        comp.RevealRange = math.max(tonumber(current) or 0, 5000)
+        if comp.RevealRangeZ ~= nil then
+            comp.RevealRangeZ = math.max(tonumber(comp.RevealRangeZ) or 0, 5000)
+        end
+    end)
+    if not ok then
+        return false, tostring(err)
+    end
+    local after = snapshot(comp, "RevealRange")
+    FoW.BoundObject = comp
+    FoW.BoundRevealFn = "RevealRange"
+    FoW.LastStrategy = string.format("component RevealRange %s -> %s", tostring(before), tostring(after))
+    if before ~= after then
+        return true, "property-changed"
+    end
+    return true, "call-ok"
+end
+
+local function try_client_update_fog()
+    local pc = find_first("RemnantPlayerController") or find_first("Remnant_PlayerController_C")
+    if not Util.is_valid(pc) then
+        return false, "no-player-controller"
+    end
+    -- Without a real visited-coordinates payload this may no-op, but a successful call
+    -- still proves the API is reachable on the client path.
+    local ok, err = call_method(pc, "ClientUpdateFogOfWar", nil)
+    if not ok then
+        ok, err = call_method(pc, "ClientUpdateFogOfWar")
+    end
+    if ok then
+        FoW.BoundObject = pc
+        FoW.BoundRevealFn = "ClientUpdateFogOfWar"
+        FoW.LastStrategy = "RemnantPlayerController:ClientUpdateFogOfWar"
+        return true, "call-ok"
+    end
+    return false, err
+end
+
+function FoW.read_revealed_tiles()
+    if Util.is_valid(FoW.BoundModel) then
+        local ok, value = pcall(function()
+            return FoW.BoundModel.VisitedCoordinatesOwner or FoW.BoundModel.TileBounds
+        end)
+        if ok then return value, nil end
+    end
+    if Util.is_valid(FoW.BoundObject) and FoW.BoundReadProp then
+        local ok, value = pcall(function()
+            return FoW.BoundObject[FoW.BoundReadProp]
+        end)
+        if ok then return value, nil end
+        return nil, tostring(value)
+    end
+    return nil, "no-bound-read"
+end
+
+function FoW.reveal_tile(zone_id, x, y)
+    Status.RevealAttempts = (Status.RevealAttempts or 0) + 1
+    -- Prefer model/manager strategies already validated.
+    if FoW.BoundRevealFn == "RevealHiddenArea" and Util.is_valid(FoW.BoundModel) then
+        local ok, detail = try_reveal_hidden_area(FoW.BoundModel)
+        if ok then
+            Status.RevealSuccesses = (Status.RevealSuccesses or 0) + 1
+            FoW.AppliedTiles[string.format("%s:%s:%s", tostring(zone_id), tostring(x), tostring(y))] = true
+        end
+        return ok, detail
+    end
+    if FoW.BoundRevealFn == "EnableFogOfWar" and Util.is_valid(FoW.BoundManager) then
+        local ok, detail = try_enable_fog_manager(FoW.BoundManager)
+        if ok then
+            Status.RevealSuccesses = (Status.RevealSuccesses or 0) + 1
+        end
+        return ok, detail
+    end
+    if Util.is_valid(FoW.BoundObject) and FoW.BoundRevealFn then
+        local ok, err = call_method(FoW.BoundObject, FoW.BoundRevealFn, zone_id or 0, x or 0, y or 0)
+        if not ok then
+            ok, err = call_method(FoW.BoundObject, FoW.BoundRevealFn)
+        end
+        if ok then
+            Status.RevealSuccesses = (Status.RevealSuccesses or 0) + 1
+            return true, "call-ok"
+        end
+        FoW.LastError = err
+        return false, err
+    end
+    return false, "no-bound-reveal"
+end
+
 function FoW.run_viability_probe()
-    Status.set("Probing", "dumping reflection")
+    Status.set("Probing", "resolving Remnant minimap")
     Status.print_screen(3.0)
 
-    local candidates = Probe.run_dump()
+    -- Keep dump for diagnostics, but binding is now Remnant-specific.
+    local candidates = {}
+    pcall(function()
+        candidates = Probe.run_dump() or {}
+    end)
     Status.CandidateCount = #candidates
 
-    local obj, reveal_fn, read_prop, meta = pick_binding(candidates)
-    FoW.BoundObject = obj
-    FoW.BoundRevealFn = reveal_fn
-    FoW.BoundReadProp = read_prop
-
-    if not Util.is_valid(obj) then
-        FoW.Viable = false
-        Status.FoWViable = false
-        Status.set("FoW FAIL", "no map/fog candidates")
-        Status.print_screen(5.0)
-        Util.log("%s", "VIABILITY=NO-GO reason=no-candidates")
-        return false, "no-candidates"
-    end
+    local manager, model = resolve_manager_and_model()
+    FoW.BoundManager = manager
+    FoW.BoundModel = model
 
     Util.log(
-        "bound class=%s reveal=%s read=%s score=%s",
-        Util.safe_class_name(obj),
-        tostring(reveal_fn),
-        tostring(read_prop),
-        tostring(meta and meta.score)
+        "resolve manager=%s model=%s",
+        Util.safe_name(manager),
+        Util.safe_name(model)
     )
+
+    local attempts = {
+        function() return try_enable_fog_manager(manager) end,
+        function() return try_reveal_hidden_area(model) end,
+        function() return try_bump_reveal_range() end,
+        function() return try_toggle_fog_cheat() end,
+        function() return try_client_update_fog() end,
+    }
 
     local reveal_ok = false
     local reveal_detail = nil
-    if reveal_fn then
-        reveal_ok, reveal_detail = try_call_reveal(obj, reveal_fn)
-        if reveal_ok then FoW.BoundRevealFn = reveal_fn end
-    else
-        for _, name in ipairs(REVEAL_NAMES) do
-            local ok, detail = try_call_reveal(obj, name)
-            if ok then
-                reveal_ok = true
-                reveal_detail = detail
-                FoW.BoundRevealFn = name
-                break
-            end
+    for _, attempt in ipairs(attempts) do
+        local ok, detail = attempt()
+        Util.log("strategy result ok=%s detail=%s", tostring(ok), tostring(detail))
+        if ok then
+            reveal_ok = true
+            reveal_detail = detail
+            break
         end
-    end
-
-    if reveal_ok and FoW.BoundRevealFn then
-        local ok2, detail2 = FoW.reveal_tile(0, 0, 0)
-        reveal_ok = ok2
-        reveal_detail = detail2
+        FoW.LastError = detail
     end
 
     if reveal_ok then
         FoW.Viable = true
         Status.FoWViable = true
-        Status.set("FoW OK", string.format("reveal=%s", tostring(FoW.BoundRevealFn)))
-        Status.print_screen(5.0)
-        Util.log("VIABILITY=GO reveal=%s detail=%s", tostring(FoW.BoundRevealFn), tostring(reveal_detail))
-        Util.log("%s", "Confirm visually on the minimap. If tiles changed, enable LAN sync.")
+        Status.set("FoW OK", tostring(FoW.BoundRevealFn or FoW.LastStrategy))
+        Status.print_screen(6.0)
+        Util.log("VIABILITY=GO strategy=%s detail=%s", tostring(FoW.LastStrategy), tostring(reveal_detail))
+        Util.log("%s", "Look at the minimap now. If fog toggled/tiles changed => confirmed GO.")
         return true, reveal_detail
     end
 
     FoW.Viable = false
     Status.FoWViable = false
-    local why = FoW.LastError or "reveal-failed"
+    local why = FoW.LastError or "all-strategies-failed"
     Status.set("FoW FAIL", why)
-    Status.print_screen(5.0)
+    Status.print_screen(6.0)
     Util.log("VIABILITY=NO-GO reason=%s dump=%s", why, tostring(Probe.LastDumpPath))
     return false, why
 end
