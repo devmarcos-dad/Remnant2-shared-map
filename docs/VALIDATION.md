@@ -38,3 +38,7 @@ Send the new `UE4SS.log` + `%TEMP%\MapSyncLogs\fow_dump_*.txt`. Do not enable LA
 - `GunfireRuntime.ExplorableMinimapComponent` (`RevealRange`)
 - `Remnant.RemnantCheatManager:ToggleFogOfWar`
 - `Remnant.RemnantPlayerController:ClientUpdateFogOfWar`
+
+## After GO — Phase 2 LAN
+
+See [`LAN.md`](LAN.md). Set `EnableLanSync=true` on both PCs and run `tools/lan_bridge`.

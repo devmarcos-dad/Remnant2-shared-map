@@ -51,7 +51,7 @@ The previous build bound a `Function` UObject and crashed with `TrivialObject`.
 5. Keep `MapSync : 1` in `ue4ss\Mods\mods.txt` (do not remove it).
 6. Fully close Remnant 2 → open again → enter a world (solo is fine) → press **F7**.
 7. Open `ue4ss\UE4SS.log` and look for:
-   - `MapSync 0.1.1-poc` (confirms new build)
+   - `MapSync 0.2.0-poc` (confirms new build)
    - `VIABILITY=GO` **or** `VIABILITY=NO-GO`
 8. Also look at the minimap — fog must visibly change for a real GO.
 
@@ -73,7 +73,7 @@ Play **solo / host local**. Keys:
 1. Open the **minimap** first.
 2. Press **F7** — the game should **not** freeze (dump is F6 only now).
 3. Fog should **disappear / clear for about 3 seconds**, then come back.
-4. Log shows `MapSync 0.1.2-poc` and `VIABILITY=GO`.
+4. Log shows `MapSync 0.2.0-poc` and `VIABILITY=GO`.
 
 If F7 freezes, you still have the old build. Re-download the branch ZIP.
 
@@ -93,21 +93,27 @@ Edit [`Mods/MapSync/Scripts/config.lua`](Mods/MapSync/Scripts/config.lua):
 - `EnableLanSync = false` until GO is confirmed visually.
 - Hot-reload with UE4SS **Ctrl+R** while idle (not during level load).
 
-## Phase 2 — LAN sync (only after GO)
+## Phase 2 — LAN sync (after FoW GO)
 
 Same-house co-op: Steam still runs the game session; MapSync uses a parallel LAN channel.
 
-1. Set `EnableLanSync = true` in `config.lua` on **both** PCs.
-2. Build/run the bridge on **both** PCs:
-   ```bat
-   cd tools\lan_bridge
-   go build -o lan_bridge.exe .
-   lan_bridge.exe
-   ```
-3. Keep the bridge running while you play. It watches `%TEMP%\MapSyncQueue\` and shuttles messages over UDP (ports `27071` / `27072`).
-4. Host + Client both load MapSync. Status should move `Searching` → `Connected` / `Syncing`.
+Full steps: [`docs/LAN.md`](docs/LAN.md)
 
-Firewall: allow `lan_bridge.exe` on private networks if Windows asks.
+Short version:
+
+1. On **both** PCs set `EnableLanSync = true` in `Mods/MapSync/Scripts/config.lua`.
+2. On **both** PCs build/run the bridge:
+
+```bat
+cd tools\lan_bridge
+go build -o lan_bridge.exe .
+lan_bridge.exe
+```
+
+3. Host + Client load into the world, press **F7**, confirm status moves toward Connected / Syncing.
+4. Host explores — Client minimap should follow (fog bit + best-effort tiles).
+
+Steam P2P = later fork (swap transport only).
 
 ## Logs
 

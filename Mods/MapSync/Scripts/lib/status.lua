@@ -12,8 +12,6 @@ local Status = {
     Lan = "Off",
 }
 
--- Aliases kept for older call sites during iteration.
-
 local COLORS = {
     Boot = { R = 0.75, G = 0.75, B = 0.75, A = 1.0 },
     Probing = { R = 1.0, G = 0.85, B = 0.2, A = 1.0 },
@@ -23,6 +21,7 @@ local COLORS = {
     Connected = { R = 0.3, G = 1.0, B = 0.7, A = 1.0 },
     Syncing = { R = 0.6, G = 0.9, B = 1.0, A = 1.0 },
     Offline = { R = 0.7, G = 0.7, B = 0.7, A = 1.0 },
+    World = { R = 0.7, G = 0.9, B = 1.0, A = 1.0 },
 }
 
 function Status.set(state, detail)
@@ -40,8 +39,11 @@ function Status.line()
     return string.format(
         "[MapSync: %s] %s | candidates=%d reveal=%d/%d net=%s lan=%s",
         Status.State, Status.Detail or "",
-        Status.CandidateCount, Status.RevealSuccesses, Status.RevealAttempts,
-        Status.NetMode, Status.Lan
+        Status.CandidateCount or 0,
+        Status.RevealSuccesses or 0,
+        Status.RevealAttempts or 0,
+        tostring(Status.NetMode),
+        tostring(Status.Lan)
     )
 end
 
@@ -76,5 +78,9 @@ function Status.start_refresh_loop(interval_ms)
         return false
     end)
 end
+
+-- aliases used by older call sites
+Status.print_screen = Status.print_screen
+Status.start_refresh_loop = Status.start_refresh_loop
 
 return Status

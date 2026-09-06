@@ -19,10 +19,11 @@ end
 local function run_probe()
     refresh_net_status()
     local ok = FoW.run_viability_probe()
-    if ok and FoW.is_ready_for_lan() then
+    if ok and (FoW.is_ready_for_lan() or Config.EnableLanSync) then
+        Util.log("%s", "FoW GO — starting LAN if enabled")
         Lan.start()
     elseif ok then
-        Util.log("%s", "FoW GO — confirm tiles visually, then set EnableLanSync=true in config.lua")
+        Util.log("%s", "FoW GO — set EnableLanSync=true in config.lua, then press F7 or F9")
     end
     return ok
 end
@@ -37,21 +38,19 @@ local function bind_key(name, callback)
         Util.log("%s", "RegisterKeyBind unavailable")
         return
     end
-    pcall(function()
-        RegisterKeyBind(key, callback)
-    end)
+    pcall(function() RegisterKeyBind(key, callback) end)
 end
 
 bind_key(Config.Keys.Dump, function()
-    Util.log("%s", "F6: reflection dump")
+    Util.log("%s", "F6: heavy reflection dump")
     local candidates = Probe.run_dump()
-    Status.CandidateCount = #candidates
-    Status.set("Probing", string.format("dump=%d", #candidates))
+    Status.CandidateCount = #(candidates or {})
+    Status.set("Probing", string.format("dump=%d", Status.CandidateCount))
     Status.print_screen(3.0)
 end)
 
 bind_key(Config.Keys.ProbeReveal, function()
-    Util.log("%s", "F7: light viability probe (no full dump)")
+    Util.log("%s", "F7: light viability / LAN arm")
     run_probe()
 end)
 
@@ -63,26 +62,24 @@ end)
 bind_key(Config.Keys.DumpNet, function()
     local mode = refresh_net_status()
     Util.log("netmode=%s role=%s", mode, NetMode.role_label(mode))
+    if Config.EnableLanSync and FoW.Viable and not Lan.Active then
+        Util.log("%s", "F9: starting LAN sync")
+        Lan.start()
+    end
     Lan.debug_dump()
-    Status.print_screen(3.0)
 end)
 
 local auto_probe_scheduled = false
-
 local function schedule_auto_probe(reason)
-    if not Config.AutoProbeOnWorld or auto_probe_scheduled then
-        return
-    end
+    if not Config.AutoProbeOnWorld or auto_probe_scheduled then return end
     auto_probe_scheduled = true
     local delay = Config.AutoProbeDelayMs or 5000
     Util.log("auto-probe scheduled (%s) in %dms", tostring(reason), delay)
-
     local function fire()
         refresh_net_status()
         Status.set("Probing", "auto:" .. tostring(reason))
         run_probe()
     end
-
     if ExecuteWithDelay ~= nil then
         ExecuteWithDelay(delay, fire)
     elseif LoopAsync ~= nil then
@@ -94,18 +91,20 @@ local function schedule_auto_probe(reason)
             return true
         end)
     else
-        Util.log("%s", "No delay API; press F7 in-world to probe")
         auto_probe_scheduled = false
     end
 end
 
--- Prefer world-ready hook so we do not probe while still in the main menu.
 pcall(function()
     RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
         Util.log("%s", "ClientRestart — world available")
         Status.set("World", "ready — open minimap and press F7")
         schedule_auto_probe("ClientRestart")
+        if Config.EnableLanSync and FoW.Viable and not Lan.Active then
+            FoW.ensure_bound()
+            Lan.start()
+        end
     end)
 end)
 
-Util.log("%s", "Ready. F6=heavy dump | F7=light fog test | F8=status | F9=net")
+Util.log("%s", "Ready. F6=heavy dump | F7=fog test/LAN arm | F8=status | F9=net/LAN start")

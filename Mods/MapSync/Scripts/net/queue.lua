@@ -44,6 +44,14 @@ function Queue.send_hello(role)
     return Queue.publish(Protocol.encode_hello(role, Queue.Seq))
 end
 
+function Queue.send_bye(role)
+    return Queue.publish(Protocol.encode_bye(role, Queue.next_seq()))
+end
+
+function Queue.send_fog(enabled)
+    return Queue.publish(Protocol.encode_fog(enabled, Queue.next_seq()))
+end
+
 function Queue.send_tile(zone_id, x, y)
     return Queue.publish(Protocol.encode_tile(zone_id, x, y, Queue.next_seq()))
 end

@@ -1,24 +1,19 @@
--- MapSync personal validation config
+-- MapSync config (LAN Phase 2)
 local Config = {
     ModName = "MapSync",
-    Version = "0.1.2-poc",
+    Version = "0.2.0-poc",
 
     StatusRefreshMs = 2500,
 
-    -- Off: old auto-probe ran the heavy dump and froze the game.
     AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,
 
     MaxUObjectScan = 25000,
     MaxCandidatesLogged = 120,
 
-    -- F7 must stay light. Full UObject dump is F6 only.
     ProbeDumpOnF7 = false,
-
-    -- Leave fog disabled this long so the minimap change is obvious.
     FogOffHoldMs = 3000,
 
-    -- Prefer live Remnant / Gunfire minimap instances first.
     PriorityClassNames = {
         "ExplorableMinimapManager",
         "ExplorableMinimapModelRemnant",
@@ -43,7 +38,6 @@ local Config = {
         "enablefog", "togglefog", "updatefog", "visib",
     },
 
-    -- Meta UObject kinds we must never bind/call as gameplay instances.
     RejectClassNames = {
         "Function", "DelegateFunction", "Class", "Package", "Enum",
         "ScriptStruct", "MetaData", "PackageMap",
@@ -56,14 +50,18 @@ local Config = {
         DumpNet = "F9",
     },
 
-    -- Keep false until FoW viability = GO (visual confirmation on minimap).
+    -- Phase 2: set true on BOTH PCs after FoW GO, then run lan_bridge on both.
     EnableLanSync = false,
+    SyncFogEnabled = true,
+    SyncTiles = true,
+    MaxTilesPerPacket = 48,
+
     Lan = {
         Magic = "MS01",
         UdpPort = 27071,
         BroadcastPort = 27072,
         QueueDirName = "MapSyncQueue",
-        PollMs = 500,
+        PollMs = 750,
         HelloIntervalMs = 2000,
     },
 }

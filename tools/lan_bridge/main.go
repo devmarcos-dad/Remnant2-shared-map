@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -14,14 +13,14 @@ import (
 )
 
 // lan_bridge shuttles MapSync queue files over UDP on the LAN.
-// Layout expected under queue dir:
+// Layout under %TEMP%\MapSyncQueue:
 //
-//	outbox/*.msg  -> broadcast/send
-//	inbox/*.msg   <- received datagrams
+//	outbox/*.msg  -> broadcast/send to peers
+//	inbox/*.msg   <- received datagrams (read by the Lua mod)
 func main() {
 	queueName := flag.String("queue", "MapSyncQueue", "queue directory name under %TEMP%")
-	udpPort := flag.Int("udp", 27071, "UDP listen/send port")
-	broadcastPort := flag.Int("broadcast", 27072, "UDP broadcast discovery port")
+	udpPort := flag.Int("udp", 27071, "UDP data port")
+	broadcastPort := flag.Int("broadcast", 27072, "UDP discovery/broadcast port")
 	poll := flag.Duration("poll", 250*time.Millisecond, "outbox poll interval")
 	flag.Parse()
 
@@ -74,6 +73,7 @@ func main() {
 					continue
 				}
 				seen[full] = struct{}{}
+
 				peersMu.Lock()
 				addrs := make([]string, 0, len(peers))
 				now := time.Now()
@@ -87,7 +87,6 @@ func main() {
 				peersMu.Unlock()
 
 				if len(addrs) == 0 {
-					// No peers yet: broadcast payload on data port too.
 					_ = sendBroadcast(*udpPort, data)
 				} else {
 					for _, addr := range addrs {
@@ -124,7 +123,8 @@ func listenUDP(port int, inbox string, onPeer func(string)) {
 		onPeer(addr.String())
 		name := fmt.Sprintf("%d_%d.msg", time.Now().Unix(), time.Now().UnixNano()%1_000_000)
 		path := filepath.Join(inbox, name)
-		_ = os.WriteFile(path, append([]byte(nil), buf[:n]...), 0o644)
+		payload := append([]byte(nil), buf[:n]...)
+		_ = os.WriteFile(path, payload, 0o644)
 	}
 }
 
@@ -143,7 +143,6 @@ func listenBroadcast(broadcastPort, dataPort int, onPeer func(string)) {
 		if !strings.HasPrefix(msg, "MAPSYNC_HELLO|") {
 			continue
 		}
-		// Prefer peer's advertised data port if present.
 		parts := strings.Split(strings.TrimSpace(msg), "|")
 		peerPort := dataPort
 		if len(parts) >= 3 {
@@ -200,9 +199,6 @@ func sendTo(addr string, data []byte) error {
 		return err
 	}
 	defer conn.Close()
-	_, err = io.Copy(conn, strings.NewReader(string(data)))
-	if err != nil {
-		_, err = conn.Write(data)
-	}
+	_, err = conn.Write(data)
 	return err
 }

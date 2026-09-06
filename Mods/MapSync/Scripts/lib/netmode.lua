@@ -20,7 +20,6 @@ local NetMode = { Names = Names }
 function NetMode.get_world()
     local world = FindFirstOf("World")
     if Util.is_valid(world) then return world end
-
     local engine = FindFirstOf("GameEngine")
     if Util.is_valid(engine) then
         local ok, w = pcall(function()
@@ -28,7 +27,6 @@ function NetMode.get_world()
         end)
         if ok and Util.is_valid(w) then return w end
     end
-
     local pc = FindFirstOf("PlayerController")
     if Util.is_valid(pc) then
         local ok, w = pcall(function() return pc:GetWorld() end)

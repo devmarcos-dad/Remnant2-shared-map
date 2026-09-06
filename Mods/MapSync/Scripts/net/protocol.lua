@@ -7,22 +7,20 @@ function Protocol.magic()
 end
 
 function Protocol.encode_hello(role, seq)
-    return string.format("%s|HELLO|%s|%d|%d", Protocol.magic(), role, seq or 0, os.time())
+    return string.format("%s|HELLO|%s|%d|%d", Protocol.magic(), tostring(role or "?"), seq or 0, os.time())
 end
 
 function Protocol.encode_bye(role, seq)
-    return string.format("%s|BYE|%s|%d", Protocol.magic(), role, seq or 0)
+    return string.format("%s|BYE|%s|%d", Protocol.magic(), tostring(role or "?"), seq or 0)
+end
+
+function Protocol.encode_fog(fog_enabled, seq)
+    local bit = (fog_enabled and 1) or 0
+    return string.format("%s|FOG|%d|%d", Protocol.magic(), bit, seq or 0)
 end
 
 function Protocol.encode_tile(zone_id, x, y, seq)
-    return string.format(
-        "%s|TILE|%d|%d|%d|%d",
-        Protocol.magic(),
-        tonumber(zone_id) or 0,
-        tonumber(x) or 0,
-        tonumber(y) or 0,
-        seq or 0
-    )
+    return string.format("%s|TILE|%d|%d|%d|%d", Protocol.magic(), tonumber(zone_id) or 0, tonumber(x) or 0, tonumber(y) or 0, seq or 0)
 end
 
 function Protocol.encode_tiles(tiles, seq)
@@ -35,11 +33,9 @@ end
 
 function Protocol.decode(line)
     if line == nil or line == "" then return nil end
-    line = line:gsub("\r", ""):gsub("\n", "")
+    line = tostring(line):gsub("\r", ""):gsub("\n", "")
     local parts = {}
-    for piece in string.gmatch(line, "[^|]+") do
-        table.insert(parts, piece)
-    end
+    for piece in string.gmatch(line, "[^|]+") do table.insert(parts, piece) end
     if #parts < 2 or parts[1] ~= Protocol.magic() then return nil end
     local kind = parts[2]
     if kind == "HELLO" then
@@ -48,22 +44,17 @@ function Protocol.decode(line)
     if kind == "BYE" then
         return { kind = "BYE", role = parts[3], seq = tonumber(parts[4]) or 0 }
     end
+    if kind == "FOG" then
+        return { kind = "FOG", enabled = (tonumber(parts[3]) or 0) == 1, seq = tonumber(parts[4]) or 0 }
+    end
     if kind == "TILE" then
-        return {
-            kind = "TILE",
-            zone = tonumber(parts[3]) or 0,
-            x = tonumber(parts[4]) or 0,
-            y = tonumber(parts[5]) or 0,
-            seq = tonumber(parts[6]) or 0,
-        }
+        return { kind = "TILE", zone = tonumber(parts[3]) or 0, x = tonumber(parts[4]) or 0, y = tonumber(parts[5]) or 0, seq = tonumber(parts[6]) or 0 }
     end
     if kind == "TILES" then
         local tiles = {}
         for triple in string.gmatch(parts[3] or "", "[^,]+") do
             local z, x, y = string.match(triple, "^(%-?%d+):(%-?%d+):(%-?%d+)$")
-            if z then
-                table.insert(tiles, { zone = tonumber(z), x = tonumber(x), y = tonumber(y) })
-            end
+            if z then table.insert(tiles, { zone = tonumber(z), x = tonumber(x), y = tonumber(y) }) end
         end
         return { kind = "TILES", tiles = tiles, seq = tonumber(parts[4]) or 0 }
     end
