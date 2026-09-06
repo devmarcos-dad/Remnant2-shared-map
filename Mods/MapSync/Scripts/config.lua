@@ -1,7 +1,7 @@
--- MapSync config (LAN Phase 2)
+-- MapSync config (LAN FoW sync 0.3.0-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.2.0-poc",
+    Version = "0.3.0-poc",
 
     StatusRefreshMs = 2500,
 
@@ -14,6 +14,7 @@ local Config = {
     ProbeDumpOnF7 = false,
     FogOffHoldMs = 3000,
 
+    -- Remnant / Gunfire live class names (Phase 1 GO)
     PriorityClassNames = {
         "ExplorableMinimapManager",
         "ExplorableMinimapModelRemnant",
@@ -50,11 +51,15 @@ local Config = {
         DumpNet = "F9",
     },
 
-    -- Phase 2: set true on BOTH PCs after FoW GO, then run lan_bridge on both.
-    EnableLanSync = false,
+    -- Test branch: LAN on by default.
+    EnableLanSync = true,
     SyncFogEnabled = true,
     SyncTiles = true,
     MaxTilesPerPacket = 48,
+    SyncHostPositions = true,
+    HostPositionIntervalMs = 1000,
+    RevealRangeRadius = 1500,
+    VerboseFoWLogs = true,
 
     Lan = {
         Magic = "MS01",

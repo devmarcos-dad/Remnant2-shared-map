@@ -9,7 +9,7 @@ local Probe = {
 local function score_text(text, keywords)
     local score = 0
     local lower = Util.lower(text)
-    for _, kw in ipairs(keywords) do
+    for _, kw in ipairs(keywords or {}) do
         if string.find(lower, Util.lower(kw), 1, true) then
             score = score + 1
         end
@@ -24,28 +24,20 @@ local function is_rejected_class(class_name)
             return true
         end
     end
-    -- Also reject default objects / CDO noise when possible.
     return false
 end
 
 local function is_live_instance(obj, full_name, class_name)
-    if not Util.is_valid(obj) then
-        return false
-    end
-    if is_rejected_class(class_name) then
-        return false
-    end
+    if not Util.is_valid(obj) then return false end
+    if is_rejected_class(class_name) then return false end
     local full = Util.lower(full_name or "")
-    if string.find(full, "default__", 1, true) then
-        return false
-    end
-    -- UE4SS often surfaces Function/Class meta objects with FogOfWar-ish names.
+    if string.find(full, "default__", 1, true) then return false end
     if string.find(full, "function ", 1, true) or string.find(full, " class ", 1, true) then
         return false
     end
-    if string.find(full, "/script/", 1, true) and not string.find(full, "persistentlevel", 1, true)
+    if string.find(full, "/script/", 1, true)
+        and not string.find(full, "persistentlevel", 1, true)
         and not string.find(full, "transient", 1, true) then
-        -- Class/Function path style, not a world instance.
         if class_name == "Class" or class_name == "Function" then
             return false
         end
@@ -79,12 +71,10 @@ local function collect_reflection(obj)
         end)
     end)
 
-    -- Only probe known Remnant/Gunfire fields if iterators found nothing.
     if #props == 0 then
         for _, pname in ipairs({
             "ExplorableMinimapModel", "VisitedCoordinatesOwner", "VisitedCoordinatesMap",
-            "RevealRange", "RevealRangeZ", "TileBounds", "TileBoundsOrigin",
-            "RevealedHiddenAreasIDs", "MinimapStaticMeshList",
+            "RevealRange", "RevealRangeZ", "RevealedHiddenAreasIDs",
         }) do
             local ok, value = pcall(function() return obj[pname] end)
             if ok and value ~= nil then
@@ -96,73 +86,75 @@ local function collect_reflection(obj)
     if #funcs == 0 then
         for _, fname in ipairs({
             "EnableFogOfWar", "IsFogOfWarEnabled", "GetExplorableMinimapModel",
-            "GetExplorableMinimapManager", "RevealHiddenArea", "GetVisibilityAtLocation",
-            "ToggleFogOfWar", "ClientUpdateFogOfWar", "OnTileVisibilityUpdate",
+            "RevealHiddenArea", "ToggleFogOfWar", "ClientUpdateFogOfWar",
         }) do
-            local ok, fn = pcall(function() return obj[fname] end)
-            if ok and fn ~= nil then
+            local ok, value = pcall(function() return obj[fname] end)
+            if ok and value ~= nil then
                 table.insert(funcs, { name = fname, score = 3 })
             end
         end
     end
 
-    table.sort(props, function(a, b) return a.score > b.score end)
-    table.sort(funcs, function(a, b) return a.score > b.score end)
     return props, funcs
 end
 
-local function priority_bonus(class_name, full_name)
-    local blob = Util.lower(class_name .. " " .. full_name)
-    local bonus = 0
-    for _, name in ipairs(Config.PriorityClassNames or {}) do
-        if string.find(blob, Util.lower(name), 1, true) then
-            bonus = bonus + 20
-            break
+local function format_candidate(c)
+    local lines = {
+        string.format("score=%d class=%s", c.score or 0, c.class_name or "?"),
+        string.format("name=%s", c.full_name or "?"),
+    }
+    if c.props and #c.props > 0 then
+        local names = {}
+        for i, p in ipairs(c.props) do
+            if i > 8 then break end
+            table.insert(names, p.name)
         end
+        table.insert(lines, "props=" .. table.concat(names, ","))
     end
-    if string.find(blob, "explorableminimapmanager", 1, true) then
-        bonus = bonus + 15
+    if c.funcs and #c.funcs > 0 then
+        local names = {}
+        for i, f in ipairs(c.funcs) do
+            if i > 8 then break end
+            table.insert(names, f.name)
+        end
+        table.insert(lines, "funcs=" .. table.concat(names, ","))
     end
-    if string.find(blob, "explorableminimapmodel", 1, true) then
-        bonus = bonus + 12
-    end
-    return bonus
+    return table.concat(lines, "\n") .. "\n\n"
 end
 
-local function add_candidate(bucket, obj, source, bonus)
+local function consider(obj, bucket)
     if not Util.is_valid(obj) then return end
     local full = Util.safe_name(obj)
     local class_name = Util.safe_class_name(obj)
-    if not is_live_instance(obj, full, class_name) then
-        return
-    end
+    if not is_live_instance(obj, full, class_name) then return end
     if bucket._seen[full] then return end
     bucket._seen[full] = true
 
     local cscore = score_text(class_name .. " " .. full, Config.ClassKeywords)
-    local props, funcs = collect_reflection(obj)
-    local total = (bonus or 0) + cscore + priority_bonus(class_name, full)
-        + math.min(4, #props) + math.min(4, #funcs)
-    if total <= 0 and source ~= "priority" then return end
+    for _, name in ipairs(Config.PriorityClassNames or {}) do
+        if string.find(Util.lower(class_name .. " " .. full), Util.lower(name), 1, true) then
+            cscore = cscore + 5
+        end
+    end
+    if cscore <= 0 then return end
 
+    local props, funcs = collect_reflection(obj)
     table.insert(bucket, {
-        source = source,
-        full_name = full,
+        score = cscore + #props + #funcs,
         class_name = class_name,
-        score = total,
-        properties = props,
-        functions = funcs,
-        object = obj,
+        full_name = full,
+        props = props,
+        funcs = funcs,
     })
 end
 
 local function dump_priority_classes(bucket)
     for _, class_name in ipairs(Config.PriorityClassNames or {}) do
-        local ok, instances = pcall(function() return FindAllOf(class_name) end)
-        if ok and instances then
-            local count = 0
-            for _, obj in pairs(instances) do
-                add_candidate(bucket, obj, "priority", 25)
+        local ok, all = pcall(function() return FindAllOf(class_name) end)
+        local count = 0
+        if ok and all then
+            for _, obj in pairs(all) do
+                consider(obj, bucket)
                 count = count + 1
             end
             Util.log("priority FindAllOf(%s) => %d", class_name, count)
@@ -170,7 +162,7 @@ local function dump_priority_classes(bucket)
             local one = nil
             pcall(function() one = FindFirstOf(class_name) end)
             if Util.is_valid(one) then
-                add_candidate(bucket, one, "priority", 25)
+                consider(one, bucket)
                 Util.log("priority FindFirstOf(%s) => 1", class_name)
             else
                 Util.log("priority miss %s", class_name)
@@ -184,40 +176,17 @@ local function dump_uobject_scan(bucket)
         Util.log("%s", "ForEachUObject unavailable; skipping full scan")
         return
     end
-    local scanned = 0
     local max_scan = Config.MaxUObjectScan or 25000
+    local scanned = 0
     pcall(function()
         ForEachUObject(function(obj)
             scanned = scanned + 1
-            if scanned > max_scan then return end
-            if not Util.is_valid(obj) then return end
-            local class_name = Util.safe_class_name(obj)
-            local full = Util.safe_name(obj)
-            if not is_live_instance(obj, full, class_name) then return end
-            local cscore = score_text(class_name .. " " .. full, Config.ClassKeywords)
-            if cscore > 0 or priority_bonus(class_name, full) > 0 then
-                add_candidate(bucket, obj, "scan", cscore)
-            end
+            if scanned > max_scan then return false end
+            consider(obj, bucket)
+            return true
         end)
     end)
-    Util.log("UObject scan finished scanned=%d candidates=%d", scanned, #bucket)
-end
-
-local function format_candidate(c)
-    local prop_names, fn_names = {}, {}
-    for i, p in ipairs(c.properties) do
-        if i > 8 then break end
-        table.insert(prop_names, p.name)
-    end
-    for i, f in ipairs(c.functions) do
-        if i > 8 then break end
-        table.insert(fn_names, f.name)
-    end
-    return string.format(
-        "score=%d source=%s class=%s\n  full=%s\n  props=[%s]\n  funcs=[%s]\n",
-        c.score, c.source, c.class_name, c.full_name,
-        table.concat(prop_names, ", "), table.concat(fn_names, ", ")
-    )
+    Util.log("uobject scan counted=%d candidates=%d", scanned, #bucket)
 end
 
 function Probe.run_dump()
@@ -228,7 +197,7 @@ function Probe.run_dump()
     bucket._seen = nil
 
     table.sort(bucket, function(a, b)
-        if a.score == b.score then return a.full_name < b.full_name end
+        if a.score == b.score then return tostring(a.full_name) < tostring(b.full_name) end
         return a.score > b.score
     end)
 

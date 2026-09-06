@@ -1,12 +1,13 @@
 # Build artifacts
-*.exe
 *.dll
 *.pdb
 *.o
 *.a
-/tools/lan_bridge/lan_bridge
-/tools/lan_bridge/lan_bridge.exe
 /tmp/
+
+# Keep the shipped Windows bridge binary in git for one-step LAN testing.
+# Ignore the Linux helper binary only.
+/tools/lan_bridge/lan_bridge
 
 # Editor / OS
 .DS_Store

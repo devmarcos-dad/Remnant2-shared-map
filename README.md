@@ -93,25 +93,23 @@ Edit [`Mods/MapSync/Scripts/config.lua`](Mods/MapSync/Scripts/config.lua):
 - `EnableLanSync = false` until GO is confirmed visually.
 - Hot-reload with UE4SS **Ctrl+R** while idle (not during level load).
 
-## Phase 2 — LAN sync (after FoW GO)
+## Phase 2 — LAN sync (0.3.0-poc)
 
-Same-house co-op: Steam still runs the game session; MapSync uses a parallel LAN channel.
+Same-house co-op: Steam runs the session; MapSync uses a parallel LAN channel.
 
 Full steps: [`docs/LAN.md`](docs/LAN.md)
 
-Short version:
+Short version (both PCs):
 
-1. On **both** PCs set `EnableLanSync = true` in `Mods/MapSync/Scripts/config.lua`.
-2. On **both** PCs build/run the bridge:
+1. Replace `ue4ss\Mods\MapSync` from this branch (`EnableLanSync` is already `true`).
+2. Run the **prebuilt** bridge (no Go):
 
 ```bat
-cd tools\lan_bridge
-go build -o lan_bridge.exe .
-lan_bridge.exe
+tools\lan_bridge\lan_bridge.exe
 ```
 
-3. Host + Client load into the world, press **F7**, confirm status moves toward Connected / Syncing.
-4. Host explores — Client minimap should follow (fog bit + best-effort tiles).
+3. Steam co-op → world → **F7** once → Host explores → Client minimap should go gray.
+4. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
 
 Steam P2P = later fork (swap transport only).
 

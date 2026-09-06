@@ -34,7 +34,7 @@ function Queue.publish(line)
     if not string.find(line, "\n", 1, true) then body = line .. "\n" end
     local ok, err = Util.write_text_file(path, body)
     if not ok then
-        Util.log("outbox write failed: %s", tostring(err))
+        Util.flog("LAN", "outbox write fail path=%s err=%s", tostring(path), tostring(err))
         return false
     end
     return true
@@ -60,6 +60,10 @@ function Queue.send_tiles(tiles)
     return Queue.publish(Protocol.encode_tiles(tiles, Queue.next_seq()))
 end
 
+function Queue.send_pos(x, y, z)
+    return Queue.publish(Protocol.encode_pos(x, y, z, Queue.next_seq()))
+end
+
 function Queue.poll_inbox()
     if Queue.Inbox == nil then Queue.init() end
     local messages = {}
@@ -74,7 +78,11 @@ function Queue.poll_inbox()
                 if data then
                     for line in string.gmatch(data, "[^\r\n]+") do
                         local msg = Protocol.decode(line)
-                        if msg then table.insert(messages, msg) end
+                        if msg then
+                            table.insert(messages, msg)
+                        else
+                            Util.flog("LAN", "inbox decode fail line=%s", tostring(line):sub(1, 120))
+                        end
                     end
                 end
                 pcall(function() os.remove(full) end)

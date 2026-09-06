@@ -79,8 +79,4 @@ function Status.start_refresh_loop(interval_ms)
     end)
 end
 
--- aliases used by older call sites
-Status.print_screen = Status.print_screen
-Status.start_refresh_loop = Status.start_refresh_loop
-
 return Status

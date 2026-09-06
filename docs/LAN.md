@@ -1,77 +1,37 @@
-# MapSync Phase 2 — LAN sync
+# MapSync LAN FoW sync (0.3.0-poc)
 
-Use this only after Phase 1 FoW GO (F7 visibly changes the minimap).
+One-step retest: host explores → client minimap turns gray.
 
-## Goal
+## On both PCs
 
-Host reveals map → Client receives FoW updates over LAN (UDP) while Steam still runs the game session.
-
-## What syncs
-
-1. **Fog enabled bit** (`EnableFogOfWar`) — proven path from Phase 1
-2. **Tiles** (best-effort) from `VisitedCoordinates*` / `RevealedHiddenAreasIDs`
-
-Steam P2P is intentionally **not** in this branch. Fork later and swap only the transport.
-
-## Setup (both PCs)
-
-### 1. Same MapSync build
-
-Install/update `ue4ss\Mods\MapSync` from this branch on **both** PCs.
-
-### 2. Enable LAN in config
-
-Edit `ue4ss\Mods\MapSync\Scripts\config.lua` on **both** PCs:
-
-```lua
-EnableLanSync = true
-```
-
-Keep `SyncFogEnabled = true`. Leave `SyncTiles = true` unless it misbehaves.
-
-### 3. Build / run lan_bridge on both PCs
-
-Requirements: [Go](https://go.dev/dl/) installed.
+1. Replace `ue4ss\Mods\MapSync` with this branch’s `Mods/MapSync` (config already has `EnableLanSync=true`).
+2. Run the prebuilt bridge — **no Go install**:
 
 ```bat
-cd tools\lan_bridge
-go build -o lan_bridge.exe .
-lan_bridge.exe
+tools\lan_bridge\lan_bridge.exe
 ```
 
-Leave the window open while playing. It watches `%TEMP%\MapSyncQueue\` and shuttles `.msg` files over UDP ports **27071** / **27072**.
+Leave the window open. Allow private-network firewall if Windows asks.
 
-Windows Firewall: allow `lan_bridge.exe` on private networks when asked.
-
-### 4. Play
-
-1. Host starts Remnant 2 session (Steam co-op as usual).
-2. Client joins.
-3. Both: enter world, press **F7** once (FoW bind + arms LAN).
-4. Press **F9** to print LAN status if needed.
-5. Host explores — Client minimap should update (fog and/or tiles).
+3. Steam co-op → both enter the world → press **F7** once.
+4. Host explores. Client opens the minimap — synced areas should go gray.
 
 ## Keys
 
 | Key | Action |
 | --- | --- |
-| F6 | Heavy dump (optional, can hitch) |
-| F7 | FoW bind + arm LAN when EnableLanSync=true |
-| F8 | Toggle status |
-| F9 | Net/LAN debug; starts LAN if armed |
+| F7 | FoW bind + arm LAN |
+| F9 | Dump role / peer / sent / applied / last error |
+| F8 | Toggle on-screen status |
 
-## Logs
+## If it fails
 
-- `ue4ss\UE4SS.log` — look for `LAN started`, `host sent FOG`, `applied FOG`
-- Bridge console — `peer discovered`, `shipped ...`
-- Queue: `%TEMP%\MapSyncQueue\outbox` and `inbox`
+Send only log lines matching `[MapSync][FoW]` and `[MapSync][LAN]` from both PCs (`ue4ss\UE4SS.log`).
 
-## Troubleshooting
+Bridge console should show peer discovery and shipped messages. Queue: `%TEMP%\MapSyncQueue\`.
 
-- No `peer discovered`: same LAN? firewall? both bridges running?
-- FoW GO but no sync: `EnableLanSync=true`? F7 after world load? F9 dump?
-- Client no change: host must explore / toggle fog after LAN Connected
+## Notes
 
-## Later: Steam fork
-
-Keep `net/protocol.lua` messages (`HELLO` / `FOG` / `TILES`). Replace only `tools/lan_bridge` with a Steamworks transport. Do not rewrite FoW apply logic.
+- Do **not** rebuild the bridge unless you changed Go code.
+- Host sends `FOG` / `TILES` when available, plus `POS` every `HostPositionIntervalMs` as a trail fallback.
+- Tile apply never treats global fog-off as success.

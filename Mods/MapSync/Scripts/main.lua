@@ -19,8 +19,8 @@ end
 local function run_probe()
     refresh_net_status()
     local ok = FoW.run_viability_probe()
-    if ok and (FoW.is_ready_for_lan() or Config.EnableLanSync) then
-        Util.log("%s", "FoW GO — starting LAN if enabled")
+    if ok and Config.EnableLanSync then
+        Util.flog("LAN", "FoW GO — starting LAN role=%s", NetMode.role_label(NetMode.detect()))
         Lan.start()
     elseif ok then
         Util.log("%s", "FoW GO — set EnableLanSync=true in config.lua, then press F7 or F9")
@@ -61,9 +61,17 @@ end)
 
 bind_key(Config.Keys.DumpNet, function()
     local mode = refresh_net_status()
-    Util.log("netmode=%s role=%s", mode, NetMode.role_label(mode))
+    Util.flog(
+        "LAN",
+        "F9 role=%s active=%s peer=%s sent=%d applied=%d",
+        NetMode.role_label(mode),
+        tostring(Lan.Active),
+        tostring(Lan.PeerSeen),
+        Lan.Sent or 0,
+        Lan.Applied or 0
+    )
     if Config.EnableLanSync and FoW.Viable and not Lan.Active then
-        Util.log("%s", "F9: starting LAN sync")
+        Util.flog("LAN", "%s", "F9: starting LAN sync")
         Lan.start()
     end
     Lan.debug_dump()
@@ -107,4 +115,4 @@ pcall(function()
     end)
 end)
 
-Util.log("%s", "Ready. F6=heavy dump | F7=fog test/LAN arm | F8=status | F9=net/LAN start")
+Util.log("%s", "Ready. F6=heavy dump | F7=fog test/LAN arm | F8=status | F9=net/LAN dump")
