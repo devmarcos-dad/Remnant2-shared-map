@@ -7,8 +7,8 @@ local Lan = require("net.lan")
 local Probe = require("probe")
 
 Util.log("%s %s loading", Config.ModName or "MapSync", Config.Version or "?")
-Status.set("Boot", Config.Version or "?")
-Status.start_refresh_loop(Config.StatusRefreshMs or 2500)
+Status.set("Boot", Config.Version or "?", { force_log = true })
+Status.start_refresh_loop(Config.StatusRefreshMs or 5000)
 
 local function refresh_net_status()
     local mode = NetMode.detect()

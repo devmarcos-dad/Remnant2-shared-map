@@ -1,9 +1,15 @@
--- MapSync config (LAN FoW sync 0.3.0-poc)
+-- MapSync config (LAN FoW sync 0.3.1-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.3.0-poc",
+    Version = "0.3.1-poc",
 
-    StatusRefreshMs = 2500,
+    -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
+    -- Keep false for play; press F8 only when debugging.
+    EnableOnScreenStatus = false,
+    StatusRefreshMs = 5000,
+
+    -- Optional override when NetMode stays Unknown: "Host" | "Client" | "Solo" | nil
+    ForceLanRole = nil,
 
     AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,
@@ -66,8 +72,8 @@ local Config = {
         UdpPort = 27071,
         BroadcastPort = 27072,
         QueueDirName = "MapSyncQueue",
-        PollMs = 750,
-        HelloIntervalMs = 2000,
+        PollMs = 1000,
+        HelloIntervalMs = 5000,
     },
 }
 

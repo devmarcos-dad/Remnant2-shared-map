@@ -18,6 +18,7 @@ local Lan = {
     AppliedTiles = 0,
     AppliedPos = 0,
     LastHelloAt = 0,
+    LastHelloLogAt = 0,
     LastFogSent = nil,
     LastTileFingerprint = nil,
     LastPosAtMs = 0,
@@ -44,15 +45,17 @@ end
 
 local function maybe_hello()
     local now = os.time()
-    local every = math.floor(((Config.Lan and Config.Lan.HelloIntervalMs) or 2000) / 1000)
-    if every < 1 then every = 2 end
+    local every = math.floor(((Config.Lan and Config.Lan.HelloIntervalMs) or 5000) / 1000)
+    if every < 1 then every = 5 end
     if now - (Lan.LastHelloAt or 0) >= every then
         local ok = Queue.send_hello(Lan.Role)
         if not ok then
             Lan.LastError = "hello-outbox-write-fail"
             log("outbox write fail HELLO")
-        else
+        elseif now - (Lan.LastHelloLogAt or 0) >= 15 then
+            -- Throttle HELLO logs; was spamming UE4SS console every second.
             log("send HELLO role=%s", tostring(Lan.Role))
+            Lan.LastHelloLogAt = now
         end
         Lan.LastHelloAt = now
     end
@@ -60,10 +63,14 @@ end
 
 local function handle_message(msg)
     if msg.kind == "HELLO" then
+        local first = not Lan.PeerSeen
         Lan.PeerSeen = true
         Status.Lan = "Connected"
-        Status.set("Connected", string.format("peer=%s", tostring(msg.role)))
-        log("recv HELLO peer=%s", tostring(msg.role))
+        -- Only log/status on first connect or role change — not every HELLO.
+        if first then
+            Status.set("Connected", string.format("peer=%s", tostring(msg.role)))
+            log("recv HELLO peer=%s (connected)", tostring(msg.role))
+        end
         return
     end
     if msg.kind == "BYE" then
@@ -134,6 +141,8 @@ end
 
 local function host_send_fog()
     if Config.SyncFogEnabled == false then return end
+    -- Avoid Host↔Client fog fights when NetMode is Unknown on both PCs.
+    if Lan.Role == "Unknown" then return end
     local enabled = FoW.get_fog_enabled()
     if enabled ~= nil and enabled ~= Lan.LastFogSent then
         local ok = Queue.send_fog(enabled)
@@ -219,9 +228,7 @@ local function client_tick()
     maybe_hello()
     if not Lan.PeerSeen then
         Status.Lan = "Searching"
-        if Status.State ~= "Searching" and Status.State ~= "Syncing" and Status.State ~= "Connected" then
-            Status.set("Searching", "waiting host")
-        end
+        -- Do not Status.set every tick — that flooded the log/console.
     end
 end
 
@@ -235,7 +242,9 @@ local function tick()
             log("inbox handle fail %s", tostring(err))
         end
     end
-    if Lan.Role == "Host" or Lan.Role == "Solo" then
+    -- Host/Solo emit FOG/TILES/POS. Unknown falls back to host emit so Solo/broken
+    -- NetMode still syncs; Client only receives.
+    if Lan.Role == "Host" or Lan.Role == "Solo" or Lan.Role == "Unknown" then
         host_tick()
     else
         client_tick()
@@ -266,8 +275,11 @@ function Lan.start()
     Status.Lan = "Searching"
     Status.set("Searching", "LAN queue active — run lan_bridge.exe on BOTH PCs")
     log("started role=%s queue=%s", Lan.Role, tostring(Queue.Dir))
+    if Lan.Role == "Unknown" then
+        log("role=Unknown — set ForceLanRole=\"Host\" or \"Client\" in config.lua if needed")
+    end
 
-    local poll_ms = (Config.Lan and Config.Lan.PollMs) or 750
+    local poll_ms = (Config.Lan and Config.Lan.PollMs) or 1000
     if LoopAsync ~= nil then
         LoopAsync(poll_ms, function()
             if not Lan.Active then return true end
