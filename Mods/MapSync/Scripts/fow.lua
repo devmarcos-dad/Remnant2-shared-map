@@ -157,39 +157,78 @@ local function try_toggle_fog_cheat()
     return false, err
 end
 
+local function read_fog_enabled(manager)
+    local value = nil
+    pcall(function()
+        if manager.IsFogOfWarEnabled ~= nil then
+            value = tostring(manager:IsFogOfWarEnabled())
+        elseif manager.IsFogOfWarEnabled ~= nil then
+            value = tostring(manager:IsFogOfWarEnabled())
+        end
+    end)
+    return value
+end
+
+local function restore_fog_later(manager, enabled)
+    local hold = Config.FogOffHoldMs or 3000
+    local function restore()
+        if not Util.is_valid(manager) then
+            return
+        end
+        call_method(manager, "EnableFogOfWar", enabled)
+        Util.log("%s", "Fog restored after hold — did you see the minimap change?")
+        Status.set("FoW OK", "fog restored — check if you saw it")
+        Status.print_screen(4.0)
+    end
+    if ExecuteWithDelay ~= nil then
+        ExecuteWithDelay(hold, restore)
+    elseif LoopAsync ~= nil then
+        local done = false
+        LoopAsync(hold, function()
+            if done then return true end
+            done = true
+            restore()
+            return true
+        end)
+    else
+        -- No delay API: leave fog off so the change stays visible.
+        Util.log("%s", "No delay API — leaving fog OFF so you can inspect the minimap")
+    end
+end
+
 local function try_enable_fog_manager(manager)
     if not Util.is_valid(manager) then
         return false, "no-manager"
     end
 
-    -- Read current state when possible.
-    local before = nil
-    pcall(function()
-        if manager.IsFogOfWarEnabled ~= nil then
-            before = tostring(manager:IsFogOfWarEnabled())
-        end
-    end)
+    local before = read_fog_enabled(manager)
 
-    -- Force FoW on, then off, then on — visual flicker proves control.
-    local ok1 = select(1, call_method(manager, "EnableFogOfWar", true))
-    local ok2 = select(1, call_method(manager, "EnableFogOfWar", false))
-    local ok3 = select(1, call_method(manager, "EnableFogOfWar", true))
+    -- Turn fog OFF and leave it off for FogOffHoldMs so the change is obvious.
+    -- Instant on/off/on is too fast to see and also freezes less than the old dump,
+    -- but still easy to miss.
+    local ok_off = select(1, call_method(manager, "EnableFogOfWar", false))
+    local mid = read_fog_enabled(manager)
+    local ok_on_prep = select(1, call_method(manager, "EnableFogOfWar", true))
+    local ok_off2 = select(1, call_method(manager, "EnableFogOfWar", false))
+    local after = read_fog_enabled(manager)
 
-    local after = nil
-    pcall(function()
-        if manager.IsFogOfWarEnabled ~= nil then
-            after = tostring(manager:IsFogOfWarEnabled())
-        end
-    end)
-
-    if ok1 or ok2 or ok3 then
-        FoW.BoundObject = manager
-        FoW.BoundRevealFn = "EnableFogOfWar"
-        FoW.BoundManager = manager
-        FoW.LastStrategy = string.format("manager EnableFogOfWar before=%s after=%s", tostring(before), tostring(after))
-        return true, FoW.LastStrategy
+    if not (ok_off or ok_on_prep or ok_off2) then
+        return false, "EnableFogOfWar-failed"
     end
-    return false, "EnableFogOfWar-failed"
+
+    FoW.BoundObject = manager
+    FoW.BoundRevealFn = "EnableFogOfWar"
+    FoW.BoundManager = manager
+    FoW.LastStrategy = string.format(
+        "manager EnableFogOfWar before=%s mid=%s after=%s (fog left OFF for %dms)",
+        tostring(before), tostring(mid), tostring(after), Config.FogOffHoldMs or 3000
+    )
+
+    Util.log("%s", ">>> OPEN THE MINIMAP NOW — fog should be GONE/cleared for a few seconds <<<")
+    Status.set("FoW OK", "LOOK AT MINIMAP — fog OFF")
+    Status.print_screen(5.0)
+    restore_fog_later(manager, true)
+    return true, FoW.LastStrategy
 end
 
 local function try_reveal_hidden_area(model)
@@ -337,11 +376,15 @@ function FoW.run_viability_probe()
     Status.set("Probing", "resolving Remnant minimap")
     Status.print_screen(3.0)
 
-    -- Keep dump for diagnostics, but binding is now Remnant-specific.
+    -- F7 stays light. Full UObject dump is F6 only (it freezes the game for seconds).
     local candidates = {}
-    pcall(function()
-        candidates = Probe.run_dump() or {}
-    end)
+    if Config.ProbeDumpOnF7 then
+        pcall(function()
+            candidates = Probe.run_dump() or {}
+        end)
+    else
+        Util.log("%s", "Skipping heavy dump on F7 (use F6 if you need the reflection dump)")
+    end
     Status.CandidateCount = #candidates
 
     local manager, model = resolve_manager_and_model()
@@ -357,8 +400,8 @@ function FoW.run_viability_probe()
     local attempts = {
         function() return try_enable_fog_manager(manager) end,
         function() return try_reveal_hidden_area(model) end,
-        function() return try_bump_reveal_range() end,
         function() return try_toggle_fog_cheat() end,
+        function() return try_bump_reveal_range() end,
         function() return try_client_update_fog() end,
     }
 

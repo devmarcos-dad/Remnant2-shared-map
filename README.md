@@ -63,14 +63,23 @@ Play **solo / host local**. Keys:
 
 | Key | Action |
 | --- | --- |
-| **F6** | Reflection dump (map/fog candidates → log + `%TEMP%\MapSyncLogs\`) |
-| **F7** | Viability probe (bind candidate + attempt local reveal) |
+| **F6** | Heavy reflection dump (can freeze the game for several seconds) |
+| **F7** | Light FoW test — turns fog OFF for ~3s then restores it |
 | **F8** | Toggle on-screen status line |
 | **F9** | Print NetMode + LAN state |
 
+### What you should see on F7 (v0.1.2)
+
+1. Open the **minimap** first.
+2. Press **F7** — the game should **not** freeze (dump is F6 only now).
+3. Fog should **disappear / clear for about 3 seconds**, then come back.
+4. Log shows `MapSync 0.1.2-poc` and `VIABILITY=GO`.
+
+If F7 freezes, you still have the old build. Re-download the branch ZIP.
+
 ### Success = GO
 
-1. Press **F7** (or wait for auto-probe).
+1. Open the minimap, then press **F7** (auto-probe is off in 0.1.2).
 2. Status shows `FoW OK`.
 3. Log contains `VIABILITY=GO`.
 4. **You visually confirm** the minimap/fog changed (tiles revealed).

@@ -1,15 +1,22 @@
 -- MapSync personal validation config
 local Config = {
     ModName = "MapSync",
-    Version = "0.1.1-poc",
+    Version = "0.1.2-poc",
 
     StatusRefreshMs = 2500,
 
-    AutoProbeOnWorld = true,
+    -- Off: old auto-probe ran the heavy dump and froze the game.
+    AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,
 
     MaxUObjectScan = 25000,
     MaxCandidatesLogged = 120,
+
+    -- F7 must stay light. Full UObject dump is F6 only.
+    ProbeDumpOnF7 = false,
+
+    -- Leave fog disabled this long so the minimap change is obvious.
+    FogOffHoldMs = 3000,
 
     -- Prefer live Remnant / Gunfire minimap instances first.
     PriorityClassNames = {

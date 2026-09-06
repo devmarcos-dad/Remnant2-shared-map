@@ -9,7 +9,8 @@ Prove we can **read** and **reveal** Remnant 2 minimap FoW tiles via UE4SS refle
 1. Install UE4SS + drop in `Mods/MapSync` (see README).
 2. Launch Remnant 2, load into a world (solo is fine).
 3. Press **F6** — confirm a dump appears in `%TEMP%\MapSyncLogs\`.
-4. Press **F7** — watch on-screen status / UE4SS log.
+4. Open the **minimap**, press **F7** (light test in 0.1.2 — should not freeze).
+5. Fog should clear for ~3 seconds, then return. Log should show `0.1.2-poc`.
 
 ## Decision
 

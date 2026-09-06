@@ -51,7 +51,7 @@ bind_key(Config.Keys.Dump, function()
 end)
 
 bind_key(Config.Keys.ProbeReveal, function()
-    Util.log("%s", "F7: viability probe")
+    Util.log("%s", "F7: light viability probe (no full dump)")
     run_probe()
 end)
 
@@ -103,9 +103,9 @@ end
 pcall(function()
     RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
         Util.log("%s", "ClientRestart — world available")
-        Status.set("World", "ready — auto-probe soon / press F7")
+        Status.set("World", "ready — open minimap and press F7")
         schedule_auto_probe("ClientRestart")
     end)
 end)
 
-Util.log("%s", "Ready. F6=dump F7=probe F8=status F9=net")
+Util.log("%s", "Ready. F6=heavy dump | F7=light fog test | F8=status | F9=net")
