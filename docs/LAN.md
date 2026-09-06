@@ -1,38 +1,35 @@
-# MapSync LAN FoW sync (0.3.1-poc)
+# MapSync LAN FoW sync (0.3.2-poc)
 
-One-step retest: host explores → client minimap turns gray.
+One-step retest: host explores → client minimap turns gray (also after zone changes).
 
-## Hotfix (0.3.1)
+## What 0.3.2 fixes
 
-Previous build flooded the screen with on-screen status / HELLO spam (~1s), making the game unplayable. Fixed:
-- On-screen overlay **off** by default (`EnableOnScreenStatus=false`)
-- No `Status.set` / log spam on every HELLO
-- HELLO interval 5s; quieter logs
-- Better Host/Client detection via player authority
+After leaving a dungeon for overworld, FoW objects were still bound to the **old** zone, so new exploration stopped syncing. Now each `ClientRestart` rebinds FoW, clears tile caches, and forces a fresh TILES pass.
 
 ## On both PCs
 
-1. Replace `ue4ss\Mods\MapSync` with this branch’s `Mods/MapSync`.
-2. Run the prebuilt bridge:
+1. Replace `ue4ss\Mods\MapSync` (confirm log: `MapSync 0.3.2-poc`).
+2. Run `tools\lan_bridge\lan_bridge.exe` on both.
+3. Co-op → world → **F7** once.
+4. Host explores (dungeon and overworld). Client minimap should update in **both**.
+5. After each zone change, wait ~3s for auto-rebind (log: `world changed` / `rebound after zone change`).
 
-```bat
-tools\lan_bridge\lan_bridge.exe
-```
+## ForceLanRole (if needed)
 
-3. Steam co-op → world → **F7** once.
-4. Host explores. Client minimap should go gray.
-5. Optional: **F8** toggles on-screen status (off by default). **F9** dumps LAN counters to the log only.
+In `Mods/MapSync/Scripts/config.lua`:
 
-## If role stays Unknown
+- Host PC: `ForceLanRole = "Host",`
+- Client PC: `ForceLanRole = "Client",`
 
-In `config.lua` set on each PC:
+## What this syncs / does not sync
 
-```lua
-ForceLanRole = "Host"   -- session host
--- or
-ForceLanRole = "Client" -- joiner
-```
+| Syncs | Does **not** sync yet |
+| --- | --- |
+| Fog-of-war / explored gray areas | Chest / item / loot icons on the map |
+| Host trail via `POS` (fallback) | Objectives / quest markers |
+
+Map icons are a separate Remnant system from FoW tiles.
 
 ## If it fails
 
-Send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both `UE4SS.log` files.
+Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs, especially around zone changes (`ClientRestart`, `world reset`, `send TILES`, `apply`).

@@ -1,7 +1,7 @@
--- MapSync config (LAN FoW sync 0.3.1-poc)
+-- MapSync config (LAN FoW sync 0.3.2-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.3.1-poc",
+    Version = "0.3.2-poc",
 
     -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
     -- Keep false for play; press F8 only when debugging.
@@ -13,6 +13,8 @@ local Config = {
 
     AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,
+    -- Delay after ClientRestart before rebinding FoW (zone / overworld transition).
+    WorldRebindDelayMs = 2500,
 
     MaxUObjectScan = 25000,
     MaxCandidatesLogged = 120,

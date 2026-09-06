@@ -103,16 +103,45 @@ local function schedule_auto_probe(reason)
     end
 end
 
+local rebind_generation = 0
+local function schedule_world_rebind(reason)
+    rebind_generation = rebind_generation + 1
+    local gen = rebind_generation
+    local delay = Config.WorldRebindDelayMs or 2500
+    Util.flog("LAN", "schedule world rebind (%s) in %dms", tostring(reason), delay)
+    local function fire()
+        if gen ~= rebind_generation then return end
+        refresh_net_status()
+        Lan.on_world_changed(reason)
+    end
+    if ExecuteWithDelay ~= nil then
+        ExecuteWithDelay(delay, fire)
+    elseif LoopAsync ~= nil then
+        local fired = false
+        LoopAsync(delay, function()
+            if fired then return true end
+            fired = true
+            fire()
+            return true
+        end)
+    else
+        fire()
+    end
+end
+
 pcall(function()
     RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
         Util.log("%s", "ClientRestart — world available")
-        Status.set("World", "ready — open minimap and press F7")
+        Status.set("World", "zone/world ready")
         schedule_auto_probe("ClientRestart")
-        if Config.EnableLanSync and FoW.Viable and not Lan.Active then
+        -- Always rebind after zone change when FoW was viable / LAN armed.
+        if FoW.Viable or Lan.Active then
+            schedule_world_rebind("ClientRestart")
+        elseif Config.EnableLanSync and FoW.Viable and not Lan.Active then
             FoW.ensure_bound()
             Lan.start()
         end
     end)
 end)
 
-Util.log("%s", "Ready. F6=heavy dump | F7=fog test/LAN arm | F8=status | F9=net/LAN dump")
+Util.log("%s", "Ready. F6=dump | F7=FoW/LAN | F8=status overlay | F9=LAN dump (log only)")

@@ -319,9 +319,29 @@ function FoW.ensure_bound()
     return FoW.bind()
 end
 
+-- Zone / world transition: old UObjects die; clear caches and force a fresh bind.
+function FoW.reset_for_new_world(reason)
+    log("world reset reason=%s", tostring(reason or "?"))
+    FoW.manager = nil
+    FoW.model = nil
+    FoW.component = nil
+    FoW.player_controller = nil
+    FoW.BoundManager = nil
+    FoW.BoundModel = nil
+    FoW.BoundObject = nil
+    FoW.AppliedTiles = {}
+    FoW.last_collect_reason = "world-reset"
+    FoW.last_apply_method = nil
+    FoW.last_error = nil
+    local ok = FoW.bind()
+    log("world reset bind=%s", tostring(ok))
+    return ok
+end
+
 function FoW.is_bound()
-    return FoW.manager ~= nil or FoW.model ~= nil or FoW.player_controller ~= nil
-        or FoW.BoundManager ~= nil or FoW.BoundModel ~= nil
+    return (Util.is_valid(FoW.manager) or Util.is_valid(FoW.BoundManager)
+        or Util.is_valid(FoW.model) or Util.is_valid(FoW.BoundModel)
+        or Util.is_valid(FoW.player_controller))
 end
 
 function FoW.get_fog_enabled()

@@ -304,6 +304,23 @@ function Lan.stop()
     log("%s", "stopped")
 end
 
+-- Call after dungeon ↔ overworld (ClientRestart). Rebind FoW and force a fresh TILES pass.
+function Lan.on_world_changed(reason)
+    log("world changed reason=%s active=%s", tostring(reason or "?"), tostring(Lan.Active))
+    FoW.reset_for_new_world(reason)
+    Lan.LastTileFingerprint = nil
+    Lan.LastFogSent = nil
+    Lan.LastPosAtMs = 0
+    Lan.LastTileCount = 0
+    refresh_role()
+    if Lan.Active then
+        Status.set("Syncing", "rebinding after zone change")
+        log("rebound after zone change role=%s", tostring(Lan.Role))
+    elseif Config.EnableLanSync and FoW.Viable then
+        Lan.start()
+    end
+end
+
 function Lan.debug_dump()
     local mode = refresh_role()
     log(
