@@ -23,20 +23,20 @@ import (
 //
 // Modes:
 //
-//	steam  — Steam Networking Messages (requires -tags steamworks build)
-//	tcp    — direct TCP listen/dial (works today without Steamworks SDK)
-//	lan    — UDP broadcast helper (same idea as lan_bridge; prefer lan_bridge.exe)
+//	steam  — ISteamNetworkingMessages P2P (Windows: loads steam_api64.dll at runtime)
+//	tcp    — direct TCP listen/dial (diagnostic fallback)
+//	lan    — UDP broadcast helper (prefer tools/lan_bridge/lan_bridge.exe)
 func main() {
 	queueName := flag.String("queue", "MapSyncQueue", "queue directory name under %TEMP%")
-	mode := flag.String("mode", "tcp", "transport: steam | tcp | lan")
+	mode := flag.String("mode", "steam", "transport: steam | tcp | lan")
 	poll := flag.Duration("poll", 250*time.Millisecond, "outbox poll interval")
 	appID := flag.Uint("appid", 1282100, "Steam AppID (Remnant II = 1282100)")
-	peerID := flag.String("peer", "", "partner SteamID64 (or leave empty to read steam_peer.txt)")
+	peerID := flag.String("peer", "", "partner SteamID64 (or leave empty to read steam_peer.txt / auto-discover)")
 	listen := flag.String("listen", "", "TCP listen addr (-mode tcp), e.g. :27073")
 	dial := flag.String("dial", "", "TCP dial addr (-mode tcp), e.g. 1.2.3.4:27073")
 	udpPort := flag.Int("udp", 27071, "UDP data port (-mode lan)")
 	broadcastPort := flag.Int("broadcast", 27072, "UDP discovery port (-mode lan)")
-	channel := flag.Int("channel", 1, "Steam networking channel")
+	channel := flag.Int("channel", 1, "Steam networking channel (both peers must match)")
 	flag.Parse()
 
 	temp := os.Getenv("TEMP")
@@ -64,7 +64,7 @@ func main() {
 	if *peerID != "" {
 		log.Printf("peer=%s", *peerID)
 	} else {
-		log.Printf("peer not set — write SteamID64 to %s or pass -peer", peerFile)
+		log.Printf("peer not set — will try friend auto-discover (steam) or read %s / -peer", peerFile)
 	}
 
 	var transport Transport
@@ -72,10 +72,12 @@ func main() {
 	switch strings.ToLower(*mode) {
 	case "steam":
 		transport, err = newSteamTransport(steamOpts{
-			AppID:   uint32(*appID),
-			PeerID:  *peerID,
-			Channel: *channel,
-			Inbox:   inbox,
+			AppID:    uint32(*appID),
+			PeerID:   *peerID,
+			Channel:  *channel,
+			Inbox:    inbox,
+			QueueDir: queueDir,
+			PeerFile: peerFile,
 		})
 	case "tcp":
 		listenAddr := *listen

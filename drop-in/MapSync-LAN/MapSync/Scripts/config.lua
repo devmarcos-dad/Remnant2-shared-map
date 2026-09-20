@@ -1,4 +1,4 @@
--- MapSync STEAM (zero-config). Para LAN use o pacote drop-in/MapSync-LAN.
+-- MapSync LAN package (zero-config) — não edite nada para jogar na mesma rede
 local Config = {
     ModName = "MapSync",
     Version = "0.5.2-poc",
@@ -81,7 +81,7 @@ local Config = {
     VerboseFoWLogs = true,
 
     -- Transport do pacote: "steam" | "lan" | "tcp". Não mude AutoStartBridge.
-    Transport = "steam",
+    Transport = "lan",
 
     Lan = {
         Magic = "MS01",

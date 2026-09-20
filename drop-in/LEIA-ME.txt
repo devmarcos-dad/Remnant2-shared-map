@@ -1,0 +1,8 @@
+Escolha UM pacote (os dois jogadores usam o MESMO):
+
+  MapSync-Steam/   → coop pela internet (Steam P2P)  [recomendado remoto]
+  MapSync-LAN/     → mesma casa / Wi-Fi local
+
+Em cada pacote leia LEIA-ME.txt e copie a pasta MapSync para ue4ss\Mods\
+
+Não ative os dois ao mesmo tempo.

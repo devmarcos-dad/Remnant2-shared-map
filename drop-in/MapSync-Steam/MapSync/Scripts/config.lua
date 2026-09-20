@@ -1,4 +1,4 @@
--- MapSync STEAM (zero-config). Para LAN use o pacote drop-in/MapSync-LAN.
+-- MapSync STEAM package (zero-config) — não edite nada para jogar remoto
 local Config = {
     ModName = "MapSync",
     Version = "0.5.2-poc",

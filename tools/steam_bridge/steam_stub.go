@@ -1,26 +1,15 @@
-//go:build !steamworks
+//go:build !windows && !steamworks
 
 package main
 
 import "fmt"
 
-type steamOpts struct {
-	AppID   uint32
-	PeerID  string
-	Channel int
-	Inbox   string
-}
-
-// newSteamTransport is a stub until the binary is built with Steamworks SDK.
-// Build with: go build -tags steamworks
-// and provide steam_api headers/libs (see docs/STEAM.md).
+// newSteamTransport: non-Windows builds cannot load steam_api64.dll.
 func newSteamTransport(opts steamOpts) (Transport, error) {
 	return nil, fmt.Errorf(
-		"steam mode requires a steamworks-tagged build (AppID=%d peer=%q). "+
-			"For WAN testing without Steamworks SDK, use: "+
-			"steam_bridge -mode tcp -listen :27073  (host) and "+
-			"steam_bridge -mode tcp -dial HOST:27073  (client). "+
-			"See docs/STEAM.md",
+		"steam mode requires the Windows steam_bridge.exe (loads steam_api64.dll at runtime). "+
+			"AppID=%d peer=%q. Use the prebuilt tools/steam_bridge/steam_bridge.exe on Windows, "+
+			"or TCP fallback: -mode tcp. See docs/STEAM.md",
 		opts.AppID,
 		opts.PeerID,
 	)
