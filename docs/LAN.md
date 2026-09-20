@@ -1,47 +1,34 @@
-# MapSync LAN FoW sync (0.5.0-poc)
+# MapSync LAN FoW sync (0.5.1-poc)
 
-Either player explores → the other minimap turns gray. **No need to open `lan_bridge.exe` manually** for same-house LAN.
+Either player explores → the other minimap turns gray.
+
+- **Remoto / padrão:** `Transport = "steam"` auto-inicia `Bin\steam_bridge.exe` — veja [`STEAM.md`](STEAM.md).
+- **Mesma casa UDP:** `Transport = "lan"` auto-inicia `Bin\lan_bridge.exe` (sem abrir exe na mão).
+
 Press **F10** to force a two-way dump.
 
-## What 0.5.0 adds
+## What 0.5.1 adds
 
-- **Steamworks P2P** transport in `steam_bridge -mode steam` (build with `build_steamworks.bat`). See [`STEAM.md`](STEAM.md).
-- TCP remains a diagnostic fallback; LAN auto-start unchanged for same-house.
+- `steam_bridge.exe` **pré-buildado** com Steam P2P via `steam_api64.dll` em runtime (sem SDK para o jogador).
+- Auto-start do `steam_bridge` quando `Transport = "steam"`.
 
-## What 0.4.1 combined
+## On both PCs (LAN UDP)
 
-- **0.3.3**: auto-start / auto-kill `Mods/MapSync/Bin/lan_bridge.exe`
-- **0.4.0**: bidirectional TILES/POS, F10 + `SYNC_REQ`, Steam/TCP scaffold
-- FoW rebind after dungeon ↔ overworld (`ClientRestart`)
+1. Replace `ue4ss\Mods\MapSync` (must include `Bin\`).
+2. Set `Transport = "lan"` if you want UDP instead of Steam P2P.
+3. Confirm log: `MapSync 0.5.1-poc` and `boot bridge ok=true`.
+4. Co-op → **F7** → explore / **F10**.
+5. Quit → bridge auto-kills.
 
-## On both PCs (LAN / same house)
+For remote Steam steps: [`STEAM.md`](STEAM.md).
 
-1. Replace `ue4ss\Mods\MapSync` (must include `Bin\lan_bridge.exe`).
-2. Confirm log: `MapSync 0.5.0-poc` and `boot bridge ok=true`.
-3. Steam co-op → world → **F7** once.
-4. Either player explores (dungeon + overworld). The other minimap should update.
-5. Optional: **F10** for a full two-way sync.
-6. After each zone change, wait ~3s for auto-rebind (`world changed` / `rebound after zone change`).
-7. Quit the game → bridge process should exit (`shutdown bridge`).
-
-Windows Firewall may ask once to allow `lan_bridge.exe` — allow on private networks.
-
-For remote TCP / Steam bridge steps: [`STEAM.md`](STEAM.md).
-
-## Config (`Scripts/config.lua`)
+## Config
 
 ```lua
 AutoStartBridge = true
-AutoKillBridgeOnExit = true
+Transport = "steam"  -- or "lan" / "tcp"
 BidirectionalSync = true
-Transport = "lan"   -- use "steam" / "tcp" with steam_bridge (manual; set AutoStartBridge = false)
-ForceLanRole = nil  -- or "Host" / "Client" if NetMode stays Unknown
 ```
-
-## ForceLanRole (if needed)
-
-- Host PC: `ForceLanRole = "Host",`
-- Client PC: `ForceLanRole = "Client",`
 
 ## What this syncs / does not sync
 
@@ -50,10 +37,7 @@ ForceLanRole = nil  -- or "Host" / "Client" if NetMode stays Unknown
 | Fog-of-war / explored gray areas (both ways) | Chest / item / loot icons on the map |
 | Host + client trail via `POS` | Objectives / quest markers |
 | Manual F10 two-way dump | — |
-| Steam P2P / TCP / LAN transports | Map icons (separate Remnant system) |
-
-Map icons are a separate Remnant system from FoW tiles.
 
 ## If it fails
 
-Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs (look for `boot bridge`, `force_sync`, `world changed`, `send TILES`, `apply`).
+Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs (look for `boot bridge`, `force_sync`, `send TILES`, `apply`).
