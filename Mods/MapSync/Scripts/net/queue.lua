@@ -64,6 +64,10 @@ function Queue.send_pos(x, y, z)
     return Queue.publish(Protocol.encode_pos(x, y, z, Queue.next_seq()))
 end
 
+function Queue.send_sync_req(role)
+    return Queue.publish(Protocol.encode_sync_req(role, Queue.next_seq()))
+end
+
 function Queue.poll_inbox()
     if Queue.Inbox == nil then Queue.init() end
     local messages = {}

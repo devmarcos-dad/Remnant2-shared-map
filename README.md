@@ -66,7 +66,8 @@ Play **solo / host local**. Keys:
 | **F6** | Heavy reflection dump (can freeze the game for several seconds) |
 | **F7** | Light FoW test — turns fog OFF for ~3s then restores it |
 | **F8** | Toggle on-screen status line |
-| **F9** | Print NetMode + LAN state |
+| **F9** | Print NetMode + sync state |
+| **F10** | Force two-way map sync (push local + request peer dump) |
 
 ### What you should see on F7 (v0.1.2)
 
@@ -93,7 +94,7 @@ Edit [`Mods/MapSync/Scripts/config.lua`](Mods/MapSync/Scripts/config.lua):
 - `EnableLanSync = false` until GO is confirmed visually.
 - Hot-reload with UE4SS **Ctrl+R** while idle (not during level load).
 
-## Phase 2 — LAN sync (0.3.0-poc)
+## Phase 2 — LAN sync (0.3.x)
 
 Same-house co-op: Steam runs the session; MapSync uses a parallel LAN channel.
 
@@ -108,10 +109,26 @@ Short version (both PCs):
 tools\lan_bridge\lan_bridge.exe
 ```
 
-3. Steam co-op → world → **F7** once → Host explores → Client minimap should go gray.
-4. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
+3. Steam co-op → world → **F7** once → either player explores → the other minimap should go gray.
+4. Optional: **F10** force two-way sync.
+5. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
 
-Steam P2P = later fork (swap transport only).
+## Phase 3 — Bidirectional + Steam path (0.4.0-poc)
+
+- Lua: both roles emit FoW tiles/POS; **F10** pushes local map and requests the peer dump (`SYNC_REQ`).
+- Bridge: `tools/steam_bridge` with working **TCP** WAN mode today; **Steam P2P** scaffold awaiting Steamworks SDK.
+
+Details: [`docs/STEAM.md`](docs/STEAM.md)
+
+```bat
+REM Host (listener)
+tools\steam_bridge\steam_bridge.exe -mode tcp -listen :27073
+
+REM Client
+tools\steam_bridge\steam_bridge.exe -mode tcp -dial HOST:27073
+```
+
+Set `Transport = "tcp"` (or `"steam"` when the Steamworks build is ready) in `config.lua`.
 
 ## Logs
 
@@ -123,4 +140,4 @@ Steam P2P = later fork (swap transport only).
 
 - Remnant 2 has no kernel AC for this QoL path; still use at your own risk.
 - This build is for **personal validation**, not Nexus release polish.
-- Steam P2P is intentionally out of scope until LAN FoW sync works for you.
+- Steamworks P2P linking is the remaining transport milestone; TCP mode unblocks remote tests now.

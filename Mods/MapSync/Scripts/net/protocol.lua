@@ -49,6 +49,11 @@ function Protocol.encode_pos(x, y, z, seq)
     )
 end
 
+-- Ask peer to push their current FoW dump (tiles/pos). role = who is requesting.
+function Protocol.encode_sync_req(role, seq)
+    return string.format("%s|SYNC_REQ|%s|%d|%d", Protocol.magic(), tostring(role or "?"), seq or 0, os.time())
+end
+
 function Protocol.decode(line)
     if line == nil or line == "" then return nil end
     line = tostring(line):gsub("\r", ""):gsub("\n", "")
@@ -93,6 +98,14 @@ function Protocol.decode(line)
             y = tonumber(parts[4]) or 0,
             z = tonumber(parts[5]) or 0,
             seq = tonumber(parts[6]) or 0,
+        }
+    end
+    if kind == "SYNC_REQ" then
+        return {
+            kind = "SYNC_REQ",
+            role = parts[3],
+            seq = tonumber(parts[4]) or 0,
+            unix = tonumber(parts[5]) or 0,
         }
     end
     return { kind = "UNKNOWN", raw = line }

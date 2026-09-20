@@ -63,18 +63,30 @@ bind_key(Config.Keys.DumpNet, function()
     local mode = refresh_net_status()
     Util.flog(
         "LAN",
-        "F9 role=%s active=%s peer=%s sent=%d applied=%d",
+        "F9 role=%s active=%s peer=%s sent=%d applied=%d transport=%s bi=%s",
         NetMode.role_label(mode),
         tostring(Lan.Active),
         tostring(Lan.PeerSeen),
         Lan.Sent or 0,
-        Lan.Applied or 0
+        Lan.Applied or 0,
+        tostring(Config.Transport or "lan"),
+        tostring(Config.BidirectionalSync ~= false)
     )
     if Config.EnableLanSync and FoW.Viable and not Lan.Active then
-        Util.flog("LAN", "%s", "F9: starting LAN sync")
+        Util.flog("LAN", "%s", "F9: starting sync")
         Lan.start()
     end
     Lan.debug_dump()
+end)
+
+bind_key(Config.Keys.ForceSync or "F10", function()
+    Util.flog("LAN", "%s", "F10: force bidirectional map sync")
+    refresh_net_status()
+    if Config.EnableLanSync and FoW.Viable and not Lan.Active then
+        Lan.start()
+    end
+    Lan.force_sync()
+    Status.print_screen(2.0)
 end)
 
 local auto_probe_scheduled = false
@@ -144,4 +156,4 @@ pcall(function()
     end)
 end)
 
-Util.log("%s", "Ready. F6=dump | F7=FoW/LAN | F8=status overlay | F9=LAN dump (log only)")
+Util.log("%s", "Ready. F6=dump | F7=FoW/sync | F8=status | F9=net dump | F10=force sync both ways")

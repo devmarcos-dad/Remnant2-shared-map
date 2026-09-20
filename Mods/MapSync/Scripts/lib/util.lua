@@ -72,7 +72,13 @@ end
 
 function Util.resolve_key(name)
     if Key ~= nil and Key[name] ~= nil then return Key[name] end
-    local fallback = { F6 = 0x75, F7 = 0x76, F8 = 0x77, F9 = 0x78 }
+    local fallback = {
+        F6 = 0x75,
+        F7 = 0x76,
+        F8 = 0x77,
+        F9 = 0x78,
+        F10 = 0x79,
+    }
     return fallback[name]
 end
 
