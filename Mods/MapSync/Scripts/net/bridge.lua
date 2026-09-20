@@ -105,6 +105,12 @@ function Bridge.start()
         return false, "AutoStartBridge=false"
     end
 
+    local transport = Util.lower(tostring(Config.Transport or "lan"))
+    if transport ~= "lan" then
+        log("skip auto-start (Transport=%s — run steam_bridge manually; see docs/STEAM.md)", transport)
+        return false, "transport-not-lan"
+    end
+
     local running, pid = any_bridge_running()
     if running then
         log("bridge already running pid=%s", tostring(pid or "?"))

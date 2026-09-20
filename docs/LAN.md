@@ -1,18 +1,23 @@
-# MapSync LAN FoW sync (0.4.1-poc)
+# MapSync LAN FoW sync (0.5.0-poc)
 
 Either player explores → the other minimap turns gray. **No need to open `lan_bridge.exe` manually** for same-house LAN.
 Press **F10** to force a two-way dump.
 
-## What 0.4.1 combines
+## What 0.5.0 adds
+
+- **Steamworks P2P** transport in `steam_bridge -mode steam` (build with `build_steamworks.bat`). See [`STEAM.md`](STEAM.md).
+- TCP remains a diagnostic fallback; LAN auto-start unchanged for same-house.
+
+## What 0.4.1 combined
 
 - **0.3.3**: auto-start / auto-kill `Mods/MapSync/Bin/lan_bridge.exe`
-- **0.4.0**: bidirectional TILES/POS, F10 + `SYNC_REQ`, Steam/TCP scaffold ([`STEAM.md`](STEAM.md))
+- **0.4.0**: bidirectional TILES/POS, F10 + `SYNC_REQ`, Steam/TCP scaffold
 - FoW rebind after dungeon ↔ overworld (`ClientRestart`)
 
 ## On both PCs (LAN / same house)
 
 1. Replace `ue4ss\Mods\MapSync` (must include `Bin\lan_bridge.exe`).
-2. Confirm log: `MapSync 0.4.1-poc` and `boot bridge ok=true`.
+2. Confirm log: `MapSync 0.5.0-poc` and `boot bridge ok=true`.
 3. Steam co-op → world → **F7** once.
 4. Either player explores (dungeon + overworld). The other minimap should update.
 5. Optional: **F10** for a full two-way sync.
@@ -29,7 +34,7 @@ For remote TCP / Steam bridge steps: [`STEAM.md`](STEAM.md).
 AutoStartBridge = true
 AutoKillBridgeOnExit = true
 BidirectionalSync = true
-Transport = "lan"   -- or "tcp" / "steam" with steam_bridge (manual for now)
+Transport = "lan"   -- use "steam" / "tcp" with steam_bridge (manual; set AutoStartBridge = false)
 ForceLanRole = nil  -- or "Host" / "Client" if NetMode stays Unknown
 ```
 
@@ -44,7 +49,8 @@ ForceLanRole = nil  -- or "Host" / "Client" if NetMode stays Unknown
 | --- | --- |
 | Fog-of-war / explored gray areas (both ways) | Chest / item / loot icons on the map |
 | Host + client trail via `POS` | Objectives / quest markers |
-| Manual F10 two-way dump | Steam P2P (TCP fallback works; Steamworks next) |
+| Manual F10 two-way dump | — |
+| Steam P2P / TCP / LAN transports | Map icons (separate Remnant system) |
 
 Map icons are a separate Remnant system from FoW tiles.
 

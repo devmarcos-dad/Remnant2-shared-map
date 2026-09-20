@@ -1,7 +1,7 @@
--- MapSync config (Steam + bidirectional FoW sync 0.4.1-poc)
+-- MapSync config (Steam P2P + bidirectional FoW sync 0.5.0-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.4.1-poc",
+    Version = "0.5.0-poc",
 
     -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
     -- Keep false for play; press F8 only when debugging.
@@ -11,7 +11,8 @@ local Config = {
     -- Optional override when NetMode stays Unknown: "Host" | "Client" | "Solo" | nil
     ForceLanRole = nil,
 
-    -- Auto-manage lan_bridge.exe (shipped in Mods/MapSync/Bin/)
+    -- Auto-manage lan_bridge.exe (shipped in Mods/MapSync/Bin/) when Transport = "lan".
+    -- For Transport = "steam" / "tcp", start tools/steam_bridge manually (see docs/STEAM.md).
     AutoStartBridge = true,
     AutoKillBridgeOnExit = true,
     -- Optional absolute/relative override; nil = auto-detect under Mods/MapSync/Bin
@@ -81,9 +82,9 @@ local Config = {
     RevealRangeRadius = 1500,
     VerboseFoWLogs = true,
 
-    -- Bridge transport: "lan" (UDP same-house) | "tcp" (WAN test) | "steam" (Steam P2P).
+    -- Bridge transport: "lan" (UDP same-house) | "tcp" (WAN diagnostic) | "steam" (Steamworks P2P).
     -- Lua always uses the file queue; only the external bridge binary changes.
-    -- AutoStartBridge currently launches lan_bridge.exe (Transport = "lan").
+    -- AutoStartBridge launches lan_bridge.exe when Transport = "lan".
     Transport = "lan",
 
     Lan = {
@@ -96,13 +97,13 @@ local Config = {
         HelloIntervalMs = 5000,
     },
 
-    -- Used by tools/steam_bridge (and documented for peer pairing).
+    -- Used by tools/steam_bridge (peer pairing + channel). See docs/STEAM.md.
     Steam = {
         AppId = 1282100, -- Remnant II
-        -- 64-bit SteamID of the co-op partner. Leave "" to read steam_peer.txt from the queue dir.
+        -- 64-bit SteamID of the co-op partner. Leave "" for steam_peer.txt / friend auto-discover.
         PeerId = "",
         Channel = 1,
-        -- Optional TCP fallback when Steamworks SDK is not linked yet:
+        -- TCP diagnostic fallback (no Steamworks link required):
         -- steam_bridge -mode tcp -listen :27073   /   -mode tcp -dial host:27073
         TcpListen = ":27073",
         TcpDial = "",
