@@ -142,4 +142,4 @@ tools\steam_bridge\steam_bridge.exe -mode tcp -dial HOST:27073
 - Remnant 2 has no kernel AC for this QoL path; still use at your own risk.
 - This build is for **personal validation**, not Nexus release polish.
 - Keep a Desktop save backup (`Remnant2-SaveBackup-*`) before co-op sync tests; restore it if progress looks wrong.
-- Default `steam_bridge` builds keep TCP/LAN working without the Steamworks SDK; use `build_steamworks.bat` for real P2P.
+- Prebuilt `Mods/MapSync/Bin/steam_bridge.exe` loads `steam_api64.dll` from the game folder — no SDK for players.
