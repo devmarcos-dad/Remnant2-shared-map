@@ -1,0 +1,18 @@
+MapSync — pacote LAN (mesma casa / mesma rede Wi-Fi)
+
+INSTALAR (os dois jogadores fazem o mesmo):
+1. Tenha UE4SS instalado no Remnant II.
+2. Copie a pasta "MapSync" desta pasta para:
+   Remnant2\Remnant2\Binaries\Win64\ue4ss\Mods\
+3. Em ue4ss\Mods\mods.txt adicione a linha:
+   MapSync : 1
+4. Abra o Remnant nos dois PCs → coop Steam → mundo → aperte F7 uma vez.
+5. Explore: o minimapa do outro deve atualizar. F10 força sync.
+
+NÃO precisa editar config. O lan_bridge sobe sozinho.
+
+ANTES DE TESTAR: confirme o backup Desktop\Remnant2-SaveBackup-*
+
+Windows Firewall pode pedir permissão para lan_bridge.exe — permita em rede privada.
+
+NÃO use este pacote junto com o pacote Steam (escolha um).

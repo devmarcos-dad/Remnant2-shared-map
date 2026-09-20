@@ -1,68 +1,24 @@
-# MapSync Steam transport (0.5.1-poc) — uso prático
+# MapSync Steam — pacote zero-config
 
-O `steam_bridge.exe` **já vem buildado**. No Windows ele carrega `steam_api64.dll` em runtime (a mesma DLL que o Remnant já tem em `Binaries\Win64`). **Não precisa** de Steamworks SDK, nem CGO, nem `build_steamworks.bat` para jogar.
+Para o jogador: use **`drop-in/MapSync-Steam/`** (leia o `LEIA-ME.txt` de lá).  
+Não precisa buildar SDK, nem editar `Transport`.
 
-## Teste remoto (dois PCs) — checklist leigo
+## Instalar
 
-**Antes:** confirme o backup `Desktop\Remnant2-SaveBackup-*`.
+1. Copie `drop-in/MapSync-Steam/MapSync` → `ue4ss\Mods\`
+2. `mods.txt`: `MapSync : 1`
+3. Backup `Desktop\Remnant2-SaveBackup-*`
+4. Steam logado → coop → **F7** → explore / **F10**
 
-1. Nos **dois** PCs: copie a pasta `Mods\MapSync` para o UE4SS (incluindo `Bin\steam_bridge.exe` e `Bin\lan_bridge.exe`).
-2. Em `config.lua` (já é o padrão nesta branch):
-   ```lua
-   Transport = "steam",
-   AutoStartBridge = true,
-   BidirectionalSync = true,
-   ```
-3. Steam aberto e logado → entre no co-op Remnant → mundo → **F7** uma vez.
-4. Explore num PC → o minimapa do outro deve atualizar. **F10** força sync 2 vias.
+Na primeira execução o `steam_bridge` sobe sozinho, grava `steam_appid.txt` / `steam_self.txt` e tenta achar o peer (friend no Remnant).
 
-O mod **sobe o `steam_bridge.exe -mode steam` sozinho**. O peer costuma ser o friend que está no Remnant; se houver vários, grave o SteamID64 do parceiro em:
+## Pacote LAN
 
-```
-%TEMP%\MapSyncQueue\steam_peer.txt
-```
+Mesma ideia em `drop-in/MapSync-LAN/` (UDP local).
 
-(ou o seu id aparece em `steam_self.txt` para enviar ao amigo).
+## Devs / fallbacks
 
-## Requisitos
-
-- Windows + Remnant II + Steam logado
-- UE4SS + MapSync com `Bin\steam_bridge.exe`
-- `steam_api64.dll` no diretório do jogo (`Binaries\Win64`) — **já vem com o Remnant**
-
-## Se o peer não conectar
-
-1. Olhe o log do bridge / UE4SS por `steam local SteamID64` e `peer`.
-2. Troquem os ids: cada um grava o `steam_self.txt` do outro em `steam_peer.txt`.
-3. Confirme que só um Remnant co-op session está ativo e que os dois são friends na Steam.
-
-## TCP (só diagnóstico)
-
-```bat
-steam_bridge.exe -mode tcp -listen :27073
-steam_bridge.exe -mode tcp -dial HOST:27073
-```
-
-```lua
-Transport = "tcp",
-AutoStartBridge = false,
-```
-
-## LAN mesma casa (UDP)
-
-```lua
-Transport = "lan",  -- auto-start lan_bridge.exe
-```
-
-## Build opcional (devs)
-
-```bat
-cd tools\steam_bridge
-build.bat
-```
-
-Copia o `.exe` para `Mods\MapSync\Bin\`. Linkagem CGO com SDK (`build_steamworks.bat`) é opcional e **não** é necessária para o usuário final.
-
-## Arquitetura
-
-Lua não fala com Steam. Só lê/escreve `%TEMP%\MapSyncQueue\` (`HELLO`/`FOG`/`TILE`/`TILES`/`POS`/`SYNC_REQ`). O bridge troca o transporte.
+- Fonte: `Mods/MapSync` (Transport padrão = steam, AutoStartBridge = true)
+- Regenerar drop-ins: `bash tools/make_dropins.sh`
+- TCP diagnóstico: `steam_bridge.exe -mode tcp ...` com `Transport = "tcp"` e `AutoStartBridge = false` (só debug)
+- Build opcional CGO: `build_steamworks.bat` (não necessário para jogar)
