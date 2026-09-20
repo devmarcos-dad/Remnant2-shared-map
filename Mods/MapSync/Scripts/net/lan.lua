@@ -4,6 +4,7 @@ local NetMode = require("lib.netmode")
 local Config = require("config")
 local FoW = require("fow")
 local Queue = require("net.queue")
+local Bridge = require("net.bridge")
 
 local Lan = {
     Active = false,
@@ -370,24 +371,24 @@ function Lan.start()
         return false
     end
     Queue.init()
+    local b_ok, b_detail = Bridge.start()
+    if not b_ok then
+        log("bridge auto-start failed: %s (LAN queue still active; start Bin\\lan_bridge.exe manually if needed)", tostring(b_detail))
+    else
+        log("bridge %s", tostring(b_detail))
+    end
     FoW.ensure_bound()
     Lan.Active = true
     refresh_role()
     Status.Lan = "Searching"
-    local bridge_hint = "lan_bridge.exe"
-    if transport_name() == "steam" or transport_name() == "tcp" then
-        bridge_hint = "steam_bridge.exe"
-    end
-    Status.set(
-        "Searching",
-        string.format("%s queue — run %s on BOTH PCs", transport_name(), bridge_hint)
-    )
+    Status.set("Searching", string.format("%s active (bridge auto-start)", transport_name()))
     log(
-        "started role=%s transport=%s bidirectional=%s queue=%s",
+        "started role=%s transport=%s bidirectional=%s queue=%s bridge=%s",
         Lan.Role,
         transport_name(),
         tostring(bidirectional_enabled()),
-        tostring(Queue.Dir)
+        tostring(Queue.Dir),
+        tostring(Bridge.is_running())
     )
     if Lan.Role == "Unknown" then
         log("role=Unknown — set ForceLanRole=\"Host\" or \"Client\" in config.lua if needed")
@@ -422,6 +423,7 @@ function Lan.stop()
     Status.Lan = "Off"
     Status.set("Offline", "sync stopped")
     log("%s", "stopped")
+    Bridge.stop()
 end
 
 -- Call after dungeon ↔ overworld (ClientRestart). Rebind FoW and force a fresh TILES pass.
@@ -446,7 +448,7 @@ end
 function Lan.debug_dump()
     local mode = refresh_role()
     log(
-        "DUMP active=%s role=%s peer=%s mode=%s enable=%s viable=%s transport=%s bi=%s",
+        "DUMP active=%s role=%s peer=%s mode=%s enable=%s viable=%s transport=%s bi=%s bridge=%s",
         tostring(Lan.Active),
         tostring(Lan.Role),
         tostring(Lan.PeerSeen),
@@ -454,7 +456,8 @@ function Lan.debug_dump()
         tostring(Config.EnableLanSync),
         tostring(FoW.Viable),
         transport_name(),
-        tostring(bidirectional_enabled())
+        tostring(bidirectional_enabled()),
+        tostring(Bridge.is_running())
     )
     log(
         "DUMP sent fog=%d tiles=%d pos=%d | applied fog=%d tiles=%d pos=%d | last_tiles=%d err=%s",

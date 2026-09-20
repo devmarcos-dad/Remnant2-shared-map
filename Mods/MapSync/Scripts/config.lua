@@ -1,7 +1,7 @@
--- MapSync config (Steam + bidirectional FoW sync 0.4.0-poc)
+-- MapSync config (Steam + bidirectional FoW sync 0.4.1-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.4.0-poc",
+    Version = "0.4.1-poc",
 
     -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
     -- Keep false for play; press F8 only when debugging.
@@ -10,6 +10,12 @@ local Config = {
 
     -- Optional override when NetMode stays Unknown: "Host" | "Client" | "Solo" | nil
     ForceLanRole = nil,
+
+    -- Auto-manage lan_bridge.exe (shipped in Mods/MapSync/Bin/)
+    AutoStartBridge = true,
+    AutoKillBridgeOnExit = true,
+    -- Optional absolute/relative override; nil = auto-detect under Mods/MapSync/Bin
+    BridgeExePath = nil,
 
     AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,
@@ -77,6 +83,7 @@ local Config = {
 
     -- Bridge transport: "lan" (UDP same-house) | "tcp" (WAN test) | "steam" (Steam P2P).
     -- Lua always uses the file queue; only the external bridge binary changes.
+    -- AutoStartBridge currently launches lan_bridge.exe (Transport = "lan").
     Transport = "lan",
 
     Lan = {

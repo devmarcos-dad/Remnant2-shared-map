@@ -5,10 +5,17 @@ local NetMode = require("lib.netmode")
 local FoW = require("fow")
 local Lan = require("net.lan")
 local Probe = require("probe")
+local Bridge = require("net.bridge")
 
 Util.log("%s %s loading", Config.ModName or "MapSync", Config.Version or "?")
 Status.set("Boot", Config.Version or "?", { force_log = true })
 Status.start_refresh_loop(Config.StatusRefreshMs or 5000)
+
+-- Warm the bridge early so F7 does not race peer discovery.
+if Config.EnableLanSync and Config.AutoStartBridge ~= false then
+    local ok, detail = Bridge.start()
+    Util.flog("LAN", "boot bridge ok=%s detail=%s", tostring(ok), tostring(detail))
+end
 
 local function refresh_net_status()
     local mode = NetMode.detect()
@@ -63,14 +70,15 @@ bind_key(Config.Keys.DumpNet, function()
     local mode = refresh_net_status()
     Util.flog(
         "LAN",
-        "F9 role=%s active=%s peer=%s sent=%d applied=%d transport=%s bi=%s",
+        "F9 role=%s active=%s peer=%s sent=%d applied=%d transport=%s bi=%s bridge=%s",
         NetMode.role_label(mode),
         tostring(Lan.Active),
         tostring(Lan.PeerSeen),
         Lan.Sent or 0,
         Lan.Applied or 0,
         tostring(Config.Transport or "lan"),
-        tostring(Config.BidirectionalSync ~= false)
+        tostring(Config.BidirectionalSync ~= false),
+        tostring(Bridge.is_running())
     )
     if Config.EnableLanSync and FoW.Viable and not Lan.Active then
         Util.flog("LAN", "%s", "F9: starting sync")
@@ -141,12 +149,17 @@ local function schedule_world_rebind(reason)
     end
 end
 
+local function shutdown_bridge(reason)
+    Util.flog("LAN", "shutdown bridge (%s)", tostring(reason))
+    pcall(function() Lan.stop() end)
+    pcall(function() Bridge.stop() end)
+end
+
 pcall(function()
     RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
         Util.log("%s", "ClientRestart — world available")
         Status.set("World", "zone/world ready")
         schedule_auto_probe("ClientRestart")
-        -- Always rebind after zone change when FoW was viable / LAN armed.
         if FoW.Viable or Lan.Active then
             schedule_world_rebind("ClientRestart")
         elseif Config.EnableLanSync and FoW.Viable and not Lan.Active then
@@ -156,4 +169,23 @@ pcall(function()
     end)
 end)
 
-Util.log("%s", "Ready. F6=dump | F7=FoW/sync | F8=status | F9=net dump | F10=force sync both ways")
+-- Best-effort exit hooks so the bridge does not keep running after Remnant quits.
+pcall(function()
+    RegisterHook("/Script/Engine.GameEngine:Close", function()
+        shutdown_bridge("GameEngine:Close")
+    end)
+end)
+pcall(function()
+    RegisterHook("/Script/Engine.GameViewportClient:HandleExitCommand", function()
+        shutdown_bridge("HandleExitCommand")
+    end)
+end)
+pcall(function()
+    if type(NotifyOnUnrealExit) == "function" then
+        NotifyOnUnrealExit(function()
+            shutdown_bridge("NotifyOnUnrealExit")
+        end)
+    end
+end)
+
+Util.log("%s", "Ready. F6=dump | F7=FoW/sync | F8=status | F9=net dump | F10=force sync | bridge auto-start/kill")

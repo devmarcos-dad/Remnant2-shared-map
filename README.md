@@ -43,19 +43,20 @@ The previous build bound a `Function` UObject and crashed with `TrivialObject`.
 **0.1.1** targets live `ExplorableMinimapManager` / model instances instead.
 
 1. Download the branch ZIP:
-   https://github.com/devmarcos-dad/Remnant2-shared-map/archive/refs/heads/cursor/mapsync-fow-validation-76fb.zip
-2. Extract it. Inside you will see `Mods\MapSync\`.
+   https://github.com/devmarcos-dad/Remnant2-shared-map/archive/refs/heads/cursor/steam-bidirectional-sync-adf5.zip
+2. Extract it. Inside you will see `Mods\MapSync\` (includes `Bin\lan_bridge.exe`).
 3. Delete the old folder completely:
    `D:\SteamLibrary\steamapps\common\Remnant2\Remnant2\Binaries\Win64\ue4ss\Mods\MapSync`
 4. Copy the new `Mods\MapSync` into `ue4ss\Mods\` (same place).
 5. Keep `MapSync : 1` in `ue4ss\Mods\mods.txt` (do not remove it).
 6. Fully close Remnant 2 → open again → enter a world (solo is fine) → press **F7**.
 7. Open `ue4ss\UE4SS.log` and look for:
-   - `MapSync 0.2.0-poc` (confirms new build)
+   - `MapSync 0.4.1-poc` (confirms new build)
+   - `boot bridge ok=true` (LAN auto-start)
    - `VIABILITY=GO` **or** `VIABILITY=NO-GO`
 8. Also look at the minimap — fog must visibly change for a real GO.
 
-PR: https://github.com/devmarcos-dad/Remnant2-shared-map/pull/1
+PR: https://github.com/devmarcos-dad/Remnant2-shared-map/pull/2
 
 ## Phase 1 — validate FoW (do this first)
 
@@ -94,29 +95,27 @@ Edit [`Mods/MapSync/Scripts/config.lua`](Mods/MapSync/Scripts/config.lua):
 - `EnableLanSync = false` until GO is confirmed visually.
 - Hot-reload with UE4SS **Ctrl+R** while idle (not during level load).
 
-## Phase 2 — LAN sync (0.3.x)
+## Phase 2 — LAN sync (0.4.1-poc)
 
 Same-house co-op: Steam runs the session; MapSync uses a parallel LAN channel.
+`lan_bridge.exe` ships under `Mods/MapSync/Bin/` and **auto-starts / auto-kills** with the game.
 
 Full steps: [`docs/LAN.md`](docs/LAN.md)
 
 Short version (both PCs):
 
-1. Replace `ue4ss\Mods\MapSync` from this branch (`EnableLanSync` is already `true`).
-2. Run the **prebuilt** bridge (no Go):
-
-```bat
-tools\lan_bridge\lan_bridge.exe
-```
-
-3. Steam co-op → world → **F7** once → either player explores → the other minimap should go gray.
+1. Replace `ue4ss\Mods\MapSync` from this branch (includes `Bin\lan_bridge.exe`).
+2. Start Remnant — bridge **auto-starts** (no manual `.exe` for LAN).
+3. Co-op → world → **F7** → either player explores → the other minimap should go gray.
 4. Optional: **F10** force two-way sync.
-5. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
+5. Quit the game — bridge **auto-kills**.
+6. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
 
-## Phase 3 — Bidirectional + Steam path (0.4.0-poc)
+## Phase 3 — Bidirectional + Steam path (0.4.x)
 
 - Lua: both roles emit FoW tiles/POS; **F10** pushes local map and requests the peer dump (`SYNC_REQ`).
 - Bridge: `tools/steam_bridge` with working **TCP** WAN mode today; **Steam P2P** scaffold awaiting Steamworks SDK.
+- LAN auto-start still targets `lan_bridge.exe` when `Transport = "lan"`.
 
 Details: [`docs/STEAM.md`](docs/STEAM.md)
 

@@ -25,7 +25,7 @@ Lua never talks to Steam directly. It only reads/writes `%TEMP%\MapSyncQueue\`.
 | Force sync hotkey **F10** (push + `SYNC_REQ`) | **Done** |
 | `steam_bridge -mode tcp` WAN path | **Done** (no Steamworks SDK required) |
 | `steam_bridge -mode steam` | Scaffold only — needs Steamworks SDK + `-tags steamworks` |
-| Same-house LAN | Still use `tools/lan_bridge/lan_bridge.exe` |
+| Same-house LAN | Still use auto-started `Mods/MapSync/Bin/lan_bridge.exe` (or `tools/lan_bridge`) |
 
 ## Bidirectional sync + F10
 

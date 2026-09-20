@@ -1,30 +1,39 @@
-# MapSync LAN FoW sync (0.4.0-poc)
+# MapSync LAN FoW sync (0.4.1-poc)
 
-One-step retest: either player explores → the other minimap turns gray (also after zone changes).
+Either player explores → the other minimap turns gray. **No need to open `lan_bridge.exe` manually** for same-house LAN.
 Press **F10** to force a two-way dump.
 
-## What 0.4.0 adds
+## What 0.4.1 combines
 
-- **Bidirectional sync**: client also emits TILES/POS (fog stays host-authoritative).
-- **F10 force sync**: push local map + `SYNC_REQ` so the peer pushes back.
-- Steam/TCP bridge scaffold: see [`docs/STEAM.md`](STEAM.md).
+- **0.3.3**: auto-start / auto-kill `Mods/MapSync/Bin/lan_bridge.exe`
+- **0.4.0**: bidirectional TILES/POS, F10 + `SYNC_REQ`, Steam/TCP scaffold ([`STEAM.md`](STEAM.md))
+- FoW rebind after dungeon ↔ overworld (`ClientRestart`)
 
-## What 0.3.2 fixed
+## On both PCs (LAN / same house)
 
-After leaving a dungeon for overworld, FoW objects were still bound to the **old** zone, so new exploration stopped syncing. Now each `ClientRestart` rebinds FoW, clears tile caches, and forces a fresh TILES pass.
+1. Replace `ue4ss\Mods\MapSync` (must include `Bin\lan_bridge.exe`).
+2. Confirm log: `MapSync 0.4.1-poc` and `boot bridge ok=true`.
+3. Steam co-op → world → **F7** once.
+4. Either player explores (dungeon + overworld). The other minimap should update.
+5. Optional: **F10** for a full two-way sync.
+6. After each zone change, wait ~3s for auto-rebind (`world changed` / `rebound after zone change`).
+7. Quit the game → bridge process should exit (`shutdown bridge`).
 
-## On both PCs
+Windows Firewall may ask once to allow `lan_bridge.exe` — allow on private networks.
 
-1. Replace `ue4ss\Mods\MapSync` (confirm log: `MapSync 0.4.0-poc`).
-2. Run `tools\lan_bridge\lan_bridge.exe` on both (same-house), **or** `tools\steam_bridge\steam_bridge.exe` for TCP/Steam — see [`STEAM.md`](STEAM.md).
-3. Co-op → world → **F7** once.
-4. Either player explores. The other minimap should update.
-5. Optional: **F10** to force a full two-way sync.
-6. After each zone change, wait ~3s for auto-rebind (log: `world changed` / `rebound after zone change`).
+For remote TCP / Steam bridge steps: [`STEAM.md`](STEAM.md).
+
+## Config (`Scripts/config.lua`)
+
+```lua
+AutoStartBridge = true
+AutoKillBridgeOnExit = true
+BidirectionalSync = true
+Transport = "lan"   -- or "tcp" / "steam" with steam_bridge (manual for now)
+ForceLanRole = nil  -- or "Host" / "Client" if NetMode stays Unknown
+```
 
 ## ForceLanRole (if needed)
-
-In `Mods/MapSync/Scripts/config.lua`:
 
 - Host PC: `ForceLanRole = "Host",`
 - Client PC: `ForceLanRole = "Client",`
@@ -41,4 +50,4 @@ Map icons are a separate Remnant system from FoW tiles.
 
 ## If it fails
 
-Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs, especially around zone changes (`ClientRestart`, `world reset`, `send TILES`, `force_sync`, `apply`).
+Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs (look for `boot bridge`, `force_sync`, `world changed`, `send TILES`, `apply`).
