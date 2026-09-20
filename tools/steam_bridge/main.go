@@ -23,12 +23,12 @@ import (
 //
 // Modes:
 //
-//	steam  — ISteamNetworkingMessages P2P (requires -tags steamworks build)
-//	tcp    — direct TCP listen/dial (diagnostic / no-SDK fallback)
+//	steam  — ISteamNetworkingMessages P2P (Windows: loads steam_api64.dll at runtime)
+//	tcp    — direct TCP listen/dial (diagnostic fallback)
 //	lan    — UDP broadcast helper (prefer tools/lan_bridge/lan_bridge.exe)
 func main() {
 	queueName := flag.String("queue", "MapSyncQueue", "queue directory name under %TEMP%")
-	mode := flag.String("mode", "tcp", "transport: steam | tcp | lan")
+	mode := flag.String("mode", "steam", "transport: steam | tcp | lan")
 	poll := flag.Duration("poll", 250*time.Millisecond, "outbox poll interval")
 	appID := flag.Uint("appid", 1282100, "Steam AppID (Remnant II = 1282100)")
 	peerID := flag.String("peer", "", "partner SteamID64 (or leave empty to read steam_peer.txt / auto-discover)")

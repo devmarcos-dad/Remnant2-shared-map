@@ -111,42 +111,25 @@ Short version (both PCs):
 5. Quit the game — bridge **auto-kills**.
 6. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
 
-## Phase 3 — Bidirectional + Steam P2P (0.5.0-poc)
+## Phase 3 — Steam P2P one-click (0.5.1-poc)
 
-- Lua: both roles emit FoW tiles/POS; **F10** pushes local map and requests the peer dump (`SYNC_REQ`).
-- Bridge: `tools/steam_bridge` with **Steamworks P2P** (`-mode steam`, `-tags steamworks` build) and **TCP** diagnostic fallback.
-- LAN auto-start still targets `lan_bridge.exe` when `Transport = "lan"`; for Steam/TCP set `AutoStartBridge = false` and run `steam_bridge` yourself.
+**Não precisa buildar nada.** O `steam_bridge.exe` já vem em `Mods/MapSync/Bin/` e carrega a `steam_api64.dll` do próprio Remnant.
 
-Full steps: [`docs/STEAM.md`](docs/STEAM.md)
+1. Copie `Mods\MapSync` (com `Bin\`) para o UE4SS nos dois PCs.
+2. `Transport = "steam"` e `AutoStartBridge = true` (já é o padrão).
+3. **Antes:** confirme backup `Desktop\Remnant2-SaveBackup-*`.
+4. Steam logado → co-op → mundo → **F7** → explore / **F10**.
 
-**Before any remote/Steam test:** confirm/restore your Desktop save backup (`Remnant2-SaveBackup-*`).
+Detalhes e fallbacks TCP/LAN: [`docs/STEAM.md`](docs/STEAM.md)
 
-### Steamworks P2P (recommended for remote co-op)
-
-```bat
-cd tools\steam_bridge
-set STEAMWORKS=C:\path\to\steamworks_sdk
-build_steamworks.bat
-
-REM Both PCs (Steam running + logged in). Peer via -peer, steam_peer.txt, or friend auto-discover:
-steam_bridge.exe -mode steam -peer PARTNER_STEAMID64
-```
-
-In `config.lua`: `Transport = "steam"` and `AutoStartBridge = false`. Then Steam co-op → world → **F7** → explore / **F10**.
-
-Requirements: Steamworks SDK, `steam_api64.dll` beside the exe, Steam client running. Details in [`docs/STEAM.md`](docs/STEAM.md).
-
-### TCP diagnostic fallback (no Steamworks SDK)
+### TCP diagnostic (opcional)
 
 ```bat
-REM Host (listener)
 tools\steam_bridge\steam_bridge.exe -mode tcp -listen :27073
-
-REM Client
 tools\steam_bridge\steam_bridge.exe -mode tcp -dial HOST:27073
 ```
 
-Set `Transport = "tcp"` in `config.lua`. Default `build.bat` (no SDK) still produces this binary; `-mode steam` then fails with a clear pointer to the docs.
+`Transport = "tcp"`, `AutoStartBridge = false`.
 
 ## Logs
 

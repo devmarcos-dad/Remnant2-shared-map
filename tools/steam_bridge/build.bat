@@ -1,6 +1,6 @@
 @echo off
-REM Default Windows build — TCP and LAN modes only (no Steamworks SDK / CGO).
-REM -mode steam will exit with a clear pointer to docs/STEAM.md.
+REM Prebuilt-friendly Windows build. Steam mode loads steam_api64.dll at runtime
+REM (no Steamworks SDK / no CGO). Remnant already ships that DLL in Binaries\Win64.
 go build -o steam_bridge.exe .
 if errorlevel 1 exit /b 1
-echo Built steam_bridge.exe (tcp/lan; steam mode stubbed)
+echo Built steam_bridge.exe (steam/tcp/lan — steam uses runtime steam_api64.dll)

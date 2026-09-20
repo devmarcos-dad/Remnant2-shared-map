@@ -1,7 +1,7 @@
--- MapSync config (Steam P2P + bidirectional FoW sync 0.5.0-poc)
+-- MapSync config (Steam P2P one-click 0.5.1-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.5.0-poc",
+    Version = "0.5.1-poc",
 
     -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
     -- Keep false for play; press F8 only when debugging.
@@ -11,8 +11,7 @@ local Config = {
     -- Optional override when NetMode stays Unknown: "Host" | "Client" | "Solo" | nil
     ForceLanRole = nil,
 
-    -- Auto-manage lan_bridge.exe (shipped in Mods/MapSync/Bin/) when Transport = "lan".
-    -- For Transport = "steam" / "tcp", start tools/steam_bridge manually (see docs/STEAM.md).
+    -- Auto-manage bridge under Mods/MapSync/Bin/ (lan_bridge or steam_bridge).
     AutoStartBridge = true,
     AutoKillBridgeOnExit = true,
     -- Optional absolute/relative override; nil = auto-detect under Mods/MapSync/Bin
@@ -82,10 +81,9 @@ local Config = {
     RevealRangeRadius = 1500,
     VerboseFoWLogs = true,
 
-    -- Bridge transport: "lan" (UDP same-house) | "tcp" (WAN diagnostic) | "steam" (Steamworks P2P).
-    -- Lua always uses the file queue; only the external bridge binary changes.
-    -- AutoStartBridge launches lan_bridge.exe when Transport = "lan".
-    Transport = "lan",
+    -- Bridge transport: "steam" (P2P remoto+LAN, padrão) | "lan" (UDP mesma casa) | "tcp" (diagnóstico).
+    -- Lua always uses the file queue; AutoStartBridge launches the matching Bin/*.exe.
+    Transport = "steam",
 
     Lan = {
         Magic = "MS01",

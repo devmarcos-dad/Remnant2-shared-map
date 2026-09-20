@@ -1,6 +1,8 @@
 --[[
-  Auto-start / stop for tools lan_bridge.exe (Windows).
-  Ships under Mods/MapSync/Bin/lan_bridge.exe.
+  Auto-start / stop for MapSync bridges (Windows).
+  - Transport=lan   → Mods/MapSync/Bin/lan_bridge.exe
+  - Transport=steam → Mods/MapSync/Bin/steam_bridge.exe -mode steam
+  - Transport=tcp   → no auto-start (needs -listen/-dial)
 ]]
 
 local Config = require("config")
@@ -10,6 +12,7 @@ local Bridge = {
     ExePath = nil,
     StartedByUs = false,
     LastError = nil,
+    Kind = nil, -- "lan" | "steam"
 }
 
 local TAG = "LAN"
@@ -51,14 +54,27 @@ local function process_alive(pid)
     return string.find(out, tostring(pid), 1, true) ~= nil
 end
 
+local function transport()
+    return Util.lower(tostring(Config.Transport or "lan"))
+end
+
+local function image_name()
+    local t = transport()
+    if t == "steam" then
+        return "steam_bridge.exe"
+    end
+    return "lan_bridge.exe"
+end
+
 local function any_bridge_running()
     local pid = read_pid()
     if process_alive(pid) then return true, pid end
-    local p = io.popen('tasklist /FI "IMAGENAME eq lan_bridge.exe" /NH 2>nul')
+    local img = image_name()
+    local p = io.popen(string.format('tasklist /FI "IMAGENAME eq %s" /NH 2>nul', img))
     if not p then return false, nil end
     local out = p:read("*a") or ""
     p:close()
-    if string.find(Util.lower(out), "lan_bridge.exe", 1, true) then
+    if string.find(Util.lower(out), Util.lower(img), 1, true) then
         return true, nil
     end
     return false, nil
@@ -69,6 +85,10 @@ function Bridge.resolve_exe()
         return Bridge.ExePath
     end
 
+    local t = transport()
+    local exeName = (t == "steam") and "steam_bridge.exe" or "lan_bridge.exe"
+    Bridge.Kind = (t == "steam") and "steam" or "lan"
+
     local configured = Config.BridgeExePath
     local candidates = {}
     if configured and configured ~= "" then
@@ -76,28 +96,49 @@ function Bridge.resolve_exe()
     end
 
     -- Typical Remnant Win64 cwd: ...\Binaries\Win64
-    table.insert(candidates, "ue4ss\\Mods\\MapSync\\Bin\\lan_bridge.exe")
-    table.insert(candidates, "Mods\\MapSync\\Bin\\lan_bridge.exe")
-    table.insert(candidates, "..\\ue4ss\\Mods\\MapSync\\Bin\\lan_bridge.exe")
-    -- Dev / repo layout next to game (rare)
-    table.insert(candidates, "tools\\lan_bridge\\lan_bridge.exe")
+    table.insert(candidates, "ue4ss\\Mods\\MapSync\\Bin\\" .. exeName)
+    table.insert(candidates, "Mods\\MapSync\\Bin\\" .. exeName)
+    table.insert(candidates, "..\\ue4ss\\Mods\\MapSync\\Bin\\" .. exeName)
+    if t == "steam" then
+        table.insert(candidates, "tools\\steam_bridge\\steam_bridge.exe")
+    else
+        table.insert(candidates, "tools\\lan_bridge\\lan_bridge.exe")
+    end
 
     for _, path in ipairs(candidates) do
         if file_exists(path) then
             Bridge.ExePath = path
-            log("bridge exe=%s", path)
+            log("bridge exe=%s transport=%s", path, t)
             return path
         end
     end
 
-    Bridge.LastError = "lan_bridge.exe not found under Mods/MapSync/Bin"
+    Bridge.LastError = exeName .. " not found under Mods/MapSync/Bin"
     log("%s", Bridge.LastError)
     return nil
 end
 
 function Bridge.is_running()
-    local running = any_bridge_running()
-    return running
+    return any_bridge_running()
+end
+
+local function start_args()
+    local t = transport()
+    if t == "steam" then
+        local args = { "-mode", "steam" }
+        local peer = Config.Steam and Config.Steam.PeerId
+        if peer and tostring(peer) ~= "" then
+            table.insert(args, "-peer")
+            table.insert(args, tostring(peer))
+        end
+        local app = Config.Steam and Config.Steam.AppId
+        if app then
+            table.insert(args, "-appid")
+            table.insert(args, tostring(app))
+        end
+        return args
+    end
+    return {}
 end
 
 function Bridge.start()
@@ -105,10 +146,14 @@ function Bridge.start()
         return false, "AutoStartBridge=false"
     end
 
-    local transport = Util.lower(tostring(Config.Transport or "lan"))
-    if transport ~= "lan" then
-        log("skip auto-start (Transport=%s — run steam_bridge manually; see docs/STEAM.md)", transport)
-        return false, "transport-not-lan"
+    local t = transport()
+    if t == "tcp" then
+        log("skip auto-start (Transport=tcp — use steam_bridge -mode tcp manually)")
+        return false, "transport-tcp"
+    end
+    if t ~= "lan" and t ~= "steam" then
+        log("skip auto-start (Transport=%s)", t)
+        return false, "transport-unsupported"
     end
 
     local running, pid = any_bridge_running()
@@ -124,10 +169,21 @@ function Bridge.start()
 
     Util.ensure_dir(queue_dir())
 
-    -- Hidden Start-Process so no console steals focus.
+    local args = start_args()
+    local argLit = ""
+    if #args > 0 then
+        local quoted = {}
+        for _, a in ipairs(args) do
+            table.insert(quoted, string.format("'%s'", tostring(a):gsub("'", "''")))
+        end
+        argLit = " -ArgumentList " .. table.concat(quoted, ",")
+    end
+
+    -- WorkingDirectory = game Win64 so steam_api64.dll resolves for -mode steam.
     local ps = string.format(
-        "powershell -NoProfile -WindowStyle Hidden -Command \"Start-Process -FilePath '%s' -WindowStyle Hidden\"",
-        exe:gsub("'", "''")
+        "powershell -NoProfile -WindowStyle Hidden -Command \"Start-Process -FilePath '%s'%s -WorkingDirectory (Get-Location).Path -WindowStyle Hidden\"",
+        exe:gsub("'", "''"),
+        argLit
     )
     local ok, err = pcall(function()
         os.execute(ps)
@@ -139,7 +195,7 @@ function Bridge.start()
     end
 
     Bridge.StartedByUs = true
-    log("bridge start requested exe=%s", exe)
+    log("bridge start requested exe=%s transport=%s", exe, t)
     return true, "started"
 end
 
@@ -158,6 +214,7 @@ function Bridge.stop()
         log("%s", "killing bridge by image name")
         pcall(function()
             os.execute('taskkill /IM lan_bridge.exe /F >nul 2>nul')
+            os.execute('taskkill /IM steam_bridge.exe /F >nul 2>nul')
         end)
     end
 
