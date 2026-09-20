@@ -93,7 +93,7 @@ Edit [`Mods/MapSync/Scripts/config.lua`](Mods/MapSync/Scripts/config.lua):
 - `EnableLanSync = false` until GO is confirmed visually.
 - Hot-reload with UE4SS **Ctrl+R** while idle (not during level load).
 
-## Phase 2 — LAN sync (0.3.0-poc)
+## Phase 2 — LAN sync (0.3.3-poc)
 
 Same-house co-op: Steam runs the session; MapSync uses a parallel LAN channel.
 
@@ -101,15 +101,11 @@ Full steps: [`docs/LAN.md`](docs/LAN.md)
 
 Short version (both PCs):
 
-1. Replace `ue4ss\Mods\MapSync` from this branch (`EnableLanSync` is already `true`).
-2. Run the **prebuilt** bridge (no Go):
-
-```bat
-tools\lan_bridge\lan_bridge.exe
-```
-
-3. Steam co-op → world → **F7** once → Host explores → Client minimap should go gray.
-4. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
+1. Replace `ue4ss\Mods\MapSync` from this branch (includes `Bin\lan_bridge.exe`).
+2. Start Remnant — bridge **auto-starts** (no manual `.exe`).
+3. Co-op → world → **F7** → Host explores → Client minimap should go gray.
+4. Quit the game — bridge **auto-kills**.
+5. On failure, send only `[MapSync][FoW]` / `[MapSync][LAN]` lines from both logs.
 
 Steam P2P = later fork (swap transport only).
 

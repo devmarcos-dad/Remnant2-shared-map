@@ -4,6 +4,7 @@ local NetMode = require("lib.netmode")
 local Config = require("config")
 local FoW = require("fow")
 local Queue = require("net.queue")
+local Bridge = require("net.bridge")
 
 local Lan = {
     Active = false,
@@ -269,11 +270,17 @@ function Lan.start()
         return false
     end
     Queue.init()
+    local b_ok, b_detail = Bridge.start()
+    if not b_ok then
+        log("bridge auto-start failed: %s (LAN queue still active; start Bin\\lan_bridge.exe manually if needed)", tostring(b_detail))
+    else
+        log("bridge %s", tostring(b_detail))
+    end
     FoW.ensure_bound()
     Lan.Active = true
     refresh_role()
     Status.Lan = "Searching"
-    Status.set("Searching", "LAN queue active — run lan_bridge.exe on BOTH PCs")
+    Status.set("Searching", "LAN active (bridge auto-start)")
     log("started role=%s queue=%s", Lan.Role, tostring(Queue.Dir))
     if Lan.Role == "Unknown" then
         log("role=Unknown — set ForceLanRole=\"Host\" or \"Client\" in config.lua if needed")
@@ -302,6 +309,7 @@ function Lan.stop()
     Status.Lan = "Off"
     Status.set("Offline", "LAN stopped")
     log("%s", "stopped")
+    Bridge.stop()
 end
 
 -- Call after dungeon ↔ overworld (ClientRestart). Rebind FoW and force a fresh TILES pass.
@@ -324,13 +332,14 @@ end
 function Lan.debug_dump()
     local mode = refresh_role()
     log(
-        "DUMP active=%s role=%s peer=%s mode=%s enable=%s viable=%s",
+        "DUMP active=%s role=%s peer=%s mode=%s enable=%s viable=%s bridge=%s",
         tostring(Lan.Active),
         tostring(Lan.Role),
         tostring(Lan.PeerSeen),
         tostring(mode),
         tostring(Config.EnableLanSync),
-        tostring(FoW.Viable)
+        tostring(FoW.Viable),
+        tostring(Bridge.is_running())
     )
     log(
         "DUMP sent fog=%d tiles=%d pos=%d | applied fog=%d tiles=%d pos=%d | last_tiles=%d err=%s",

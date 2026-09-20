@@ -1,7 +1,7 @@
--- MapSync config (LAN FoW sync 0.3.2-poc)
+-- MapSync config (LAN FoW sync 0.3.3-poc)
 local Config = {
     ModName = "MapSync",
-    Version = "0.3.2-poc",
+    Version = "0.3.3-poc",
 
     -- On-screen PrintString overlay (was causing screen spam / "popup tilt").
     -- Keep false for play; press F8 only when debugging.
@@ -10,6 +10,12 @@ local Config = {
 
     -- Optional override when NetMode stays Unknown: "Host" | "Client" | "Solo" | nil
     ForceLanRole = nil,
+
+    -- Auto-manage lan_bridge.exe (shipped in Mods/MapSync/Bin/)
+    AutoStartBridge = true,
+    AutoKillBridgeOnExit = true,
+    -- Optional absolute/relative override; nil = auto-detect under Mods/MapSync/Bin
+    BridgeExePath = nil,
 
     AutoProbeOnWorld = false,
     AutoProbeDelayMs = 5000,

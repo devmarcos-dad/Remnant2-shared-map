@@ -1,22 +1,32 @@
-# MapSync LAN FoW sync (0.3.2-poc)
+# MapSync LAN FoW sync (0.3.3-poc)
 
-One-step retest: host explores → client minimap turns gray (also after zone changes).
+Host explores → client minimap turns gray. **No need to open `lan_bridge.exe` manually.**
 
-## What 0.3.2 fixes
+## What 0.3.3 adds
 
-After leaving a dungeon for overworld, FoW objects were still bound to the **old** zone, so new exploration stopped syncing. Now each `ClientRestart` rebinds FoW, clears tile caches, and forces a fresh TILES pass.
+- Auto-starts `Mods/MapSync/Bin/lan_bridge.exe` when the mod loads / LAN arms
+- Auto-kills the bridge when the game exits (`AutoKillBridgeOnExit=true`)
+- Still rebinds FoW after dungeon ↔ overworld (`ClientRestart`)
 
 ## On both PCs
 
-1. Replace `ue4ss\Mods\MapSync` (confirm log: `MapSync 0.3.2-poc`).
-2. Run `tools\lan_bridge\lan_bridge.exe` on both.
-3. Co-op → world → **F7** once.
-4. Host explores (dungeon and overworld). Client minimap should update in **both**.
-5. After each zone change, wait ~3s for auto-rebind (log: `world changed` / `rebound after zone change`).
+1. Replace `ue4ss\Mods\MapSync` (must include `Bin\lan_bridge.exe`).
+2. Confirm log: `MapSync 0.3.3-poc` and `boot bridge ok=true`.
+3. Steam co-op → world → **F7** once.
+4. Host explores (dungeon + overworld). Client minimap should update.
+5. Quit the game → bridge process should exit (log: `shutdown bridge`).
+
+Windows Firewall may ask once to allow `lan_bridge.exe` — allow on private networks.
+
+## Config (`Scripts/config.lua`)
+
+```lua
+AutoStartBridge = true
+AutoKillBridgeOnExit = true
+ForceLanRole = nil   -- or "Host" / "Client" if NetMode stays Unknown
+```
 
 ## ForceLanRole (if needed)
-
-In `Mods/MapSync/Scripts/config.lua`:
 
 - Host PC: `ForceLanRole = "Host",`
 - Client PC: `ForceLanRole = "Client",`
@@ -25,11 +35,9 @@ In `Mods/MapSync/Scripts/config.lua`:
 
 | Syncs | Does **not** sync yet |
 | --- | --- |
-| Fog-of-war / explored gray areas | Chest / item / loot icons on the map |
-| Host trail via `POS` (fallback) | Objectives / quest markers |
-
-Map icons are a separate Remnant system from FoW tiles.
+| Fog-of-war / explored gray areas | Chest / item / loot icons |
+| Host trail via `POS` (fallback) | Quest / objective markers |
 
 ## If it fails
 
-Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs, especially around zone changes (`ClientRestart`, `world reset`, `send TILES`, `apply`).
+Send `[MapSync][FoW]` / `[MapSync][LAN]` from both logs (look for `boot bridge`, `world changed`, `send TILES`, `apply`).

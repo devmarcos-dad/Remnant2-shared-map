@@ -6,9 +6,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -17,6 +19,7 @@ import (
 //
 //	outbox/*.msg  -> broadcast/send to peers
 //	inbox/*.msg   <- received datagrams (read by the Lua mod)
+//	bridge.pid    -> process id for auto-kill from the mod
 func main() {
 	queueName := flag.String("queue", "MapSyncQueue", "queue directory name under %TEMP%")
 	udpPort := flag.Int("udp", 27071, "UDP data port")
@@ -37,13 +40,36 @@ func main() {
 	mustMkdir(outbox)
 	mustMkdir(inbox)
 
-	log.Printf("MapSync lan_bridge starting")
+	// Bind early: if port is taken, another bridge is already running.
+	dataPC, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", *udpPort))
+	if err != nil {
+		log.Printf("MapSync lan_bridge already running (udp %d busy): %v", *udpPort, err)
+		os.Exit(0)
+	}
+
+	pidPath := filepath.Join(queueDir, "bridge.pid")
+	_ = os.WriteFile(pidPath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0o644)
+	cleanup := func() {
+		_ = dataPC.Close()
+		_ = os.Remove(pidPath)
+	}
+	defer cleanup()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		cleanup()
+		os.Exit(0)
+	}()
+
+	log.Printf("MapSync lan_bridge starting pid=%d", os.Getpid())
 	log.Printf("queue=%s udp=%d broadcast=%d", queueDir, *udpPort, *broadcastPort)
 
 	var peersMu sync.Mutex
 	peers := map[string]time.Time{}
 
-	go listenUDP(*udpPort, inbox, func(addr string) {
+	go readUDP(dataPC, inbox, func(addr string) {
 		peersMu.Lock()
 		peers[addr] = time.Now()
 		peersMu.Unlock()
@@ -109,11 +135,7 @@ func mustMkdir(path string) {
 	}
 }
 
-func listenUDP(port int, inbox string, onPeer func(string)) {
-	pc, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatalf("listen udp %d: %v", port, err)
-	}
+func readUDP(pc net.PacketConn, inbox string, onPeer func(string)) {
 	buf := make([]byte, 64*1024)
 	for {
 		n, addr, err := pc.ReadFrom(buf)
@@ -131,7 +153,8 @@ func listenUDP(port int, inbox string, onPeer func(string)) {
 func listenBroadcast(broadcastPort, dataPort int, onPeer func(string)) {
 	pc, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", broadcastPort))
 	if err != nil {
-		log.Fatalf("listen broadcast %d: %v", broadcastPort, err)
+		log.Printf("listen broadcast %d (may already be running): %v", broadcastPort, err)
+		return
 	}
 	buf := make([]byte, 1024)
 	for {
